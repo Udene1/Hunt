@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma, databaseConfigured } from "../../../lib/db";
 import { findCompany, normalizeCompany } from "../../../lib/companies";
+import { collectObservations, type Observation } from "../../../lib/signal-adapters";
 
 async function persist(
   company: string,
