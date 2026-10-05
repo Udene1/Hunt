@@ -1,0 +1,149 @@
+export type Observation = {
+  source: string;
+  type: "job" | "website" | "product" | "technology" | "security" | "funding" | "leadership" | "regulatory" | "procurement" | "partnership" | "location";
+  title: string;
+  category: string;
+  url: string | null;
+  observedAt: string;
+  fingerprint: string;
+  metadata?: Record<string, string | number | boolean>;
+};
+
+export type SignalAdapterResult = {
+  observations: Observation[];
+  errors: string[];
+};
+
+export type SignalAdapter = {
+  id: string;
+  collect(company: string, domain: string | null): Promise<SignalAdapterResult>;
+};
+
+async function sha256(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+type Job = {
+  title?: string;
+  company_name?: string;
+  company?: string;
+  url?: string;
+  created_at?: string;
+  date?: string;
+  tags?: string[];
+  description?: string;
+};
+
+const match = (j: Job, company: string) =>
+  [j.company_name, j.company, j.title, j.description]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .includes(company.toLowerCase());
+
+const classifyJob = (j: Job) => {
+  const t = [j.title, j.description, ...(j.tags || [])].filter(Boolean).join(" ").toLowerCase();
+  if (/security|cyber|soc|iam|compliance|risk/.test(t)) return "Security / compliance";
+  if (/backend|platform|infrastructure|devops|site reliability|cloud|api|software engineer/.test(t)) return "Engineering / infrastructure";
+  if (/sales|business development|partnership|account executive/.test(t)) return "Commercial";
+  if (/product|operations|implementation/.test(t)) return "Product / operations";
+  return "Hiring";
+};
+
+// Job boards are an adapter, not the Hunt product. Their observations enter the
+// same evidence pipeline as every future signal family.
+const jobAdapter: SignalAdapter = {
+  id: "jobs",
+  async collect(company) {
+    const observations: Observation[] = [];
+    const errors: string[] = [];
+
+    for (const source of [
+      { name: "Remotive", url: "https://remotive.com/api/remote-jobs?search=" + encodeURIComponent(company), list: "jobs" },
+      { name: "Arbeitnow", url: "https://www.arbeitnow.com/api/job-board-api", list: "data" },
+    ]) {
+      try {
+        const response = await fetch(source.url, { cache: "no-store" });
+        if (!response.ok) throw new Error();
+        const data = await response.json();
+        for (const job of (data[source.list] || []) as Job[]) {
+          if (!match(job, company)) continue;
+          const title = job.title || "New hiring signal";
+          const url = job.url || null;
+          observations.push({
+            source: source.name,
+            type: "job",
+            title,
+            category: classifyJob(job),
+            url,
+            observedAt: job.created_at || job.date || new Date().toISOString(),
+            fingerprint: await sha256("job|" + source.name.toLowerCase() + "|" + title + "|" + String(url || "")),
+          });
+        }
+      } catch {
+        errors.push(source.name + " unavailable");
+      }
+    }
+
+    return { observations, errors };
+  },
+};
+
+const websiteAdapter: SignalAdapter = {
+  id: "official-website",
+  async collect(company, domain) {
+    if (!domain) return { observations: [], errors: [] };
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 7000);
+
+    try {
+      const response = await fetch("https://" + domain, {
+        signal: controller.signal,
+        headers: { "user-agent": "Opportunity-Intelligence/0.2 evidence-monitor" },
+        cache: "no-store",
+      });
+      if (!response.ok) return { observations: [], errors: ["Official website unavailable"] };
+
+      const html = (await response.text()).slice(0, 500_000);
+      const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/\s+/g, " ").trim() || company + " website";
+      const normalized = html
+        .replace(/<script[\s\S]*?<\/script>/gi, " ")
+        .replace(/<style[\s\S]*?<\/style>/gi, " ")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      return {
+        observations: [{
+          source: "Official website",
+          type: "website",
+          title,
+          category: "Website / product",
+          url: "https://" + domain,
+          observedAt: new Date().toISOString(),
+          fingerprint: await sha256("website|" + domain + "|" + normalized),
+          metadata: { domain, status: response.status, contentLength: normalized.length },
+        }],
+        errors: [],
+      };
+    } catch {
+      return { observations: [], errors: ["Official website unavailable"] };
+    } finally {
+      clearTimeout(timeout);
+    }
+  },
+};
+
+// New signal families should be added here, without changing the monitoring engine.
+export const SIGNAL_ADAPTERS: SignalAdapter[] = [jobAdapter, websiteAdapter];
+
+export async function collectObservations(company: string, domain: string | null) {
+  const results = await Promise.all(SIGNAL_ADAPTERS.map((adapter) => adapter.collect(company, domain)));
+  return {
+    adapters: SIGNAL_ADAPTERS.map((adapter) => adapter.id),
+    observations: results.flatMap((result) => result.observations),
+    errors: results.flatMap((result) => result.errors),
+  };
+}
