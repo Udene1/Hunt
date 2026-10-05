@@ -12,11 +12,21 @@ type Company = {
 type Monitor = {
   company: string;
   baseline: { observationCount: number; categories: string[]; established: boolean };
-  change?: { detected: boolean | null; newObservationCount: number; previousObservationCount: number };
+  change?: { detected: boolean | null; newObservationCount: number; unchangedObservationCount?: number; changedObservationCount?: number; previousObservationCount: number };
   signal: { score: number; headline: string; detail: string; commercialInterpretation: string } | null;
   observations: { source: string; title: string; category: string; url: string | null; observedAt: string }[];
   errors: string[];
   persistence?: { status: string; note: string };
+};
+
+type History = {
+  persistent: boolean;
+  observationCount: number;
+  runCount: number;
+  signalCount: number;
+  runs: { id: string; startedAt: string; finishedAt: string | null; status: string; observationCount: number; errorCount: number }[];
+  observations: { id: string; source: string; type: string; category: string; title: string; url: string | null; observedAt: string; firstSeenAt: string; lastSeenAt: string; metadata: unknown }[];
+  signals: { id: string; score: number; headline: string; detail: string; commercialInterpretation: string; createdAt: string; runId: string | null }[];
 };
 
 export default function Home() {
@@ -25,26 +35,20 @@ export default function Home() {
   const [watch, setWatch] = useState<string[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const [monitor, setMonitor] = useState<Record<string, Monitor>>({});
+  const [history, setHistory] = useState<Record<string, History>>({});
   const [loading, setLoading] = useState<string | null>(null);
+  const [historyLoading, setHistoryLoading] = useState<string | null>(null);
   const [watchPersistent, setWatchPersistent] = useState(false);
 
   useEffect(() => {
-    fetch("/api/companies")
-      .then((r) => r.json())
-      .then((d) => setCompanies(d.companies || []))
-      .catch(() => {});
-    try {
-      setWatch(JSON.parse(localStorage.getItem("hunt-watchlist") || "[]"));
-    } catch {}
-    fetch("/api/watch")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.persistent) {
-          setWatchPersistent(true);
-          setWatch((d.companies || []).map((c: Company) => c.name));
-        }
-      })
-      .catch(() => {});
+    fetch("/api/companies").then((r) => r.json()).then((d) => setCompanies(d.companies || [])).catch(() => {});
+    try { setWatch(JSON.parse(localStorage.getItem("hunt-watchlist") || "[]")); } catch {}
+    fetch("/api/watch").then((r) => r.json()).then((d) => {
+      if (d.persistent) {
+        setWatchPersistent(true);
+        setWatch((d.companies || []).map((c: Company) => c.name));
+      }
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -54,10 +58,17 @@ export default function Home() {
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     if (!needle) return companies;
-    return companies.filter((c) =>
-      [c.name, c.domain, c.description, ...c.sectors].join(" ").toLowerCase().includes(needle)
-    );
+    return companies.filter((c) => [c.name, c.domain, c.description, ...c.sectors].join(" ").toLowerCase().includes(needle));
   }, [companies, q]);
+
+  async function loadHistory(company: string) {
+    setHistoryLoading(company);
+    try {
+      const r = await fetch("/api/history?company=" + encodeURIComponent(company), { cache: "no-store" });
+      const data = await r.json();
+      if (r.ok) setHistory((h) => ({ ...h, [company]: data }));
+    } finally { setHistoryLoading(null); }
+  }
 
   async function runMonitor(company: string) {
     setLoading(company);
@@ -66,9 +77,8 @@ export default function Home() {
       const r = await fetch("/api/monitor?company=" + encodeURIComponent(company), { cache: "no-store" });
       const data = await r.json();
       setMonitor((m) => ({ ...m, [company]: data }));
-    } finally {
-      setLoading(null);
-    }
+      await loadHistory(company);
+    } finally { setLoading(null); }
   }
 
   async function toggleWatch(company: string) {
@@ -78,19 +88,22 @@ export default function Home() {
       await fetch("/api/watch?company=" + encodeURIComponent(company), { method: "DELETE" }).catch(() => {});
       return;
     }
-
     setWatch((x) => [...x, company]);
     const r = await fetch("/api/watch", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ company }),
     }).catch(() => null);
-
     if (r?.ok) {
       const data = await r.json().catch(() => ({}));
       if (data.persistent) setWatchPersistent(true);
     }
     void runMonitor(company);
+  }
+
+  async function openHistory(company: string) {
+    setActive(company);
+    if (!history[company]) await loadHistory(company);
   }
 
   return (
@@ -103,10 +116,7 @@ export default function Home() {
       <section className="hero">
         <p className="eyebrow">THE COMMERCIAL SIGNAL LAYER</p>
         <h1>Watch companies.<br /><em>Find reasons to contact them.</em></h1>
-        <p className="sub">
-          We continuously collect public evidence around companies, detect meaningful changes,
-          and turn independent observations into commercial signals.
-        </p>
+        <p className="sub">We continuously collect public evidence around companies, detect meaningful changes, and turn independent observations into commercial signals.</p>
         <div className="search">
           <span>⌕</span>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search companies, sectors or signals…" />
@@ -124,80 +134,77 @@ export default function Home() {
           {filtered.map((company) => (
             <article key={company.name} className="card">
               <div className="cardTop">
-                <div>
-                  <h3>{company.name}</h3>
-                  <strong>{company.sectors.slice(0, 3).join(" · ")}</strong>
-                </div>
+                <div><h3>{company.name}</h3><strong>{company.sectors.slice(0, 3).join(" · ")}</strong></div>
                 <div className="score" style={{ fontSize: 14, fontWeight: 500 }}>NG</div>
               </div>
               <p>{company.description}</p>
-              <div className="tags">
-                {company.sectors.map((tag) => <span key={tag}>{tag}</span>)}
-              </div>
+              <div className="tags">{company.sectors.map((tag) => <span key={tag}>{tag}</span>)}</div>
               {monitor[company.name]?.signal && (
-                <div className="why">
-                  <b>Latest detected signal · {monitor[company.name].signal!.score}</b>
-                  {monitor[company.name].signal!.headline} — {monitor[company.name].signal!.commercialInterpretation}
-                </div>
+                <div className="why"><b>Latest detected signal · {monitor[company.name].signal!.score}</b>{monitor[company.name].signal!.headline} — {monitor[company.name].signal!.commercialInterpretation}</div>
               )}
               <button className="watch" onClick={() => toggleWatch(company.name)}>
                 {watch.includes(company.name) ? "Watching · refresh evidence" : "Watch company →"}
               </button>
               {watch.includes(company.name) && (
-                <button className="refresh" style={{ marginLeft: 12 }} onClick={() => runMonitor(company.name)}>
-                  {loading === company.name ? "Scanning…" : "Scan now"}
-                </button>
+                <>
+                  <button className="refresh" style={{ marginLeft: 12 }} onClick={() => runMonitor(company.name)}>{loading === company.name ? "Scanning…" : "Scan now"}</button>
+                  <button className="refresh" style={{ marginLeft: 8 }} onClick={() => openHistory(company.name)}>{historyLoading === company.name ? "Loading…" : "History"}</button>
+                </>
               )}
             </article>
           ))}
 
-          {active && monitor[active] && (
+          {active && (monitor[active] || history[active]) && (
             <section className="evidence">
               <div className="sectionHead">
                 <h2>{active} · evidence history</h2>
-                <button className="refresh" onClick={() => runMonitor(active)}>
-                  {loading === active ? "Scanning…" : "Refresh scan"}
-                </button>
+                <div>
+                  <button className="refresh" onClick={() => loadHistory(active)}>{historyLoading === active ? "Loading…" : "Reload history"}</button>
+                  <button className="refresh" style={{ marginLeft: 8 }} onClick={() => runMonitor(active)}>{loading === active ? "Scanning…" : "Refresh scan"}</button>
+                </div>
               </div>
 
-              <div className="evidenceSummary">
-                <strong>{monitor[active].baseline.observationCount}</strong>
-                <span>current observations</span>
-                <strong>{monitor[active].change?.newObservationCount ?? 0}</strong>
-                <span>new since baseline</span>
-              </div>
-
-              {monitor[active].change?.detected && (
-                <div className="why">
-                  <b>Change detected</b>
-                  New evidence has appeared since the company's stored baseline.
-                </div>
-              )}
-
-              {monitor[active].signal && (
-                <div className="why">
-                  <b>Commercial interpretation</b>
-                  {monitor[active].signal!.commercialInterpretation}
-                </div>
-              )}
-
-              {monitor[active].observations.map((o, i) => (
-                <div className="observation" key={o.source + "-" + o.title + "-" + i}>
-                  <span>{o.source}</span>
-                  <div>
-                    <b>{o.title}</b>
-                    <small>{o.category} · {new Date(o.observedAt).toLocaleDateString()}</small>
+              {history[active] && (
+                <>
+                  <div className="evidenceSummary">
+                    <strong>{history[active].observationCount}</strong><span>stored observations</span>
+                    <strong>{history[active].runCount}</strong><span>monitoring runs</span>
+                    <strong>{history[active].signalCount}</strong><span>signals</span>
                   </div>
-                  {o.url && <a href={o.url} target="_blank" rel="noreferrer">Evidence ↗</a>}
-                </div>
-              ))}
 
-              {monitor[active].errors.map((e) => <small className="error" key={e}>{e}</small>)}
-              {monitor[active].persistence && (
-                <small className="error" style={{ color: "#777" }}>
-                  {monitor[active].persistence!.note}
-                </small>
+                  {history[active].signals[0] && (
+                    <div className="why">
+                      <b>Latest commercial signal · {history[active].signals[0].score}</b>
+                      {history[active].signals[0].headline} — {history[active].signals[0].commercialInterpretation}
+                    </div>
+                  )}
+
+                  <div className="sectionHead" style={{ marginTop: 24 }}>
+                    <h2>Observation timeline</h2><span>{history[active].observations.length} STORED</span>
+                  </div>
+                  {history[active].observations.map((o) => (
+                    <div className="observation" key={o.id}>
+                      <span>{o.source}</span>
+                      <div><b>{o.title}</b><small>{o.category} · first seen {new Date(o.firstSeenAt).toLocaleDateString()} · last seen {new Date(o.lastSeenAt).toLocaleDateString()}</small></div>
+                      {o.url && <a href={o.url} target="_blank" rel="noreferrer">Evidence ↗</a>}
+                    </div>
+                  ))}
+
+                  <div className="sectionHead" style={{ marginTop: 24 }}>
+                    <h2>Run history</h2><span>{history[active].runs.length} RUNS</span>
+                  </div>
+                  {history[active].runs.map((r) => (
+                    <div className="observation" key={r.id}>
+                      <span>{r.status}</span>
+                      <div><b>{new Date(r.startedAt).toLocaleString()}</b><small>{r.observationCount} observations · {r.errorCount} errors</small></div>
+                    </div>
+                  ))}
+                </>
               )}
+
+              {monitor[active]?.change?.detected && <div className="why"><b>Change detected</b>New evidence has appeared since the company's stored baseline.</div>}
+              {monitor[active]?.errors.map((e) => <small className="error" key={e}>{e}</small>)}
+              {monitor[active]?.persistence && <small className="error" style={{ color: "#777" }}>{monitor[active].persistence!.note}</small>}
             </section>
           )}
         </div>
@@ -206,27 +213,15 @@ export default function Home() {
           <div className="panel">
             <p className="eyebrow">WATCHLIST</p>
             <h2>{watch.length} companies</h2>
-            <p>
-              A watched company is not just saved. It becomes a monitored source of future evidence.
-            </p>
+            <p>A watched company is not just saved. It becomes a monitored source of future evidence.</p>
             {!watch.length && <div className="empty">Watch a company to start its first evidence scan.</div>}
-            {watch.map((w) => (
-              <button className="watchItem" key={w} onClick={() => runMonitor(w)}>
-                {w}<span>{loading === w ? "…" : "●"}</span>
-              </button>
-            ))}
-            <small style={{ color: "#999" }}>
-              {watchPersistent ? "Durable watchlist connected" : "Local watchlist · durable storage activates with DATABASE_URL"}
-            </small>
+            {watch.map((w) => <button className="watchItem" key={w} onClick={() => openHistory(w)}>{w}<span>{history[w] ? "●" : "○"}</span></button>)}
+            <small style={{ color: "#999" }}>{watchPersistent ? "Durable watchlist connected" : "Local watchlist · durable storage activates with DATABASE_URL"}</small>
           </div>
-
           <div className="panel dark">
             <p className="eyebrow">PRODUCT RULE</p>
             <h2>AI is the investigator.<br />Evidence is the product.</h2>
-            <p>
-              Jobs are only one adapter. The engine is being built to detect website,
-              product, technology, security, funding, procurement and other public changes.
-            </p>
+            <p>Jobs are only one adapter. The engine is being built to detect website, product, technology, security, funding, procurement and other public changes.</p>
           </div>
         </aside>
       </section>
