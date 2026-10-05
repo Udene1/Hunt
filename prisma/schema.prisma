@@ -31,19 +31,20 @@ model Watch {
 }
 
 model MonitoringRun {
-  id          String    @id @default(cuid())
-  companyId   String
-  startedAt   DateTime  @default(now())
-  finishedAt  DateTime?
-  status      String    @default("running")
-  observationCount Int  @default(0)
-  errorCount  Int       @default(0)
-  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  signals     Signal[]
+  id               String         @id @default(cuid())
+  companyId        String
+  startedAt        DateTime       @default(now())
+  finishedAt       DateTime?
+  status           String         @default("running")
+  observationCount Int            @default(0)
+  errorCount       Int            @default(0)
+  company          Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  observations     Observation[]
+  signals          Signal[]
 }
 
 model Observation {
-  id          String   @id @default(cuid())
+  id          String         @id @default(cuid())
   companyId   String
   runId       String?
   source      String
@@ -53,10 +54,10 @@ model Observation {
   url         String?
   fingerprint String
   observedAt  DateTime
-  firstSeenAt DateTime @default(now())
-  lastSeenAt  DateTime @default(now())
+  firstSeenAt DateTime      @default(now())
+  lastSeenAt  DateTime      @default(now())
   metadata    Json?
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company     Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   run         MonitoringRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
 
   @@unique([companyId, fingerprint])
@@ -64,16 +65,16 @@ model Observation {
 }
 
 model Signal {
-  id                    String   @id @default(cuid())
-  companyId             String
-  runId                 String?
-  score                 Int
-  headline              String
-  detail                String
+  id                       String         @id @default(cuid())
+  companyId                String
+  runId                   String?
+  score                    Int
+  headline                 String
+  detail                   String
   commercialInterpretation String
-  createdAt              DateTime @default(now())
-  company               Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  run                   MonitoringRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+  createdAt                DateTime       @default(now())
+  company                  Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  run                      MonitoringRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
 
   @@index([companyId, createdAt])
 }
