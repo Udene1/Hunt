@@ -116,6 +116,7 @@ async function persist(
       let newObservationCount = 0;
       let unchangedObservationCount = 0;
       let changedObservationCount = 0;
+      const changedObservations: Observation[] = [];
 
       for (const observation of observations) {
         const existing = await tx.observation.findUnique({
@@ -138,7 +139,10 @@ async function persist(
             select: { id: true },
             take: 1,
           });
-          if (priorVersions.length) changedObservationCount++;
+          if (priorVersions.length) {
+            changedObservationCount++;
+            changedObservations.push(observation);
+          }
 
           await tx.observation.create({
             data: {
@@ -158,14 +162,33 @@ async function persist(
         }
       }
 
+      const recent = await tx.observation.findMany({
+        where: {
+          companyId: dbCompany.id,
+          observedAt: { gte: new Date(Date.now() - 30 * 86400000) },
+        },
+        select: { category: true, type: true },
+        take: 200,
+      });
+      const changedCategories = Array.from(new Set([
+        ...observations
+          .filter((observation) => changedObservations.some((changed) => changed.fingerprint === observation.fingerprint))
+          .map((observation) => observation.category),
+      ]));
+      const recentCategories = Array.from(new Set(recent.map((observation) => observation.category)));
+      const clusterCategories = Array.from(new Set([...changedCategories, ...recentCategories]));
+      const clusterStrength = Math.min(3, changedCategories.length) + (clusterCategories.length >= 2 ? 1 : 0);
+
       if (signal && (newObservationCount > 0 || changedObservationCount > 0)) {
         await tx.signal.create({
           data: {
             companyId: dbCompany.id,
             runId: run.id,
-            score: signal.score,
-            headline: signal.headline,
-            detail: signal.detail,
+            score: Math.min(99, signal.score + clusterStrength * 4),
+            headline: clusterCategories.length >= 2 ? "Cross-signal activity detected" : signal.headline,
+            detail: clusterCategories.length >= 2
+              ? signal.detail + " Recent evidence spans " + clusterCategories.length + " signal categories."
+              : signal.detail,
             commercialInterpretation: signal.commercialInterpretation,
           },
         });
@@ -187,6 +210,8 @@ async function persist(
         unchangedObservationCount,
         changedObservationCount,
         previousObservationCount,
+        changedCategories,
+        clusterCategories,
       };
     });
     return result;
@@ -201,6 +226,8 @@ async function persist(
       unchangedObservationCount: 0,
       changedObservationCount: 0,
       previousObservationCount: 0,
+      changedCategories: [],
+      clusterCategories: [],
     };
   }
 }
