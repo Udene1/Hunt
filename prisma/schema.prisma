@@ -5,6 +5,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["hunt"]
 }
 
 model Company {
@@ -19,6 +20,7 @@ model Company {
   observations Observation[]
   runs         MonitoringRun[]
   signals      Signal[]
+  @@schema("hunt")
 }
 
 model Watch {
@@ -26,8 +28,8 @@ model Watch {
   companyId String
   createdAt DateTime @default(now())
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
   @@unique([companyId])
+  @@schema("hunt")
 }
 
 model MonitoringRun {
@@ -41,6 +43,7 @@ model MonitoringRun {
   company          Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   observations     Observation[]
   signals          Signal[]
+  @@schema("hunt")
 }
 
 model Observation {
@@ -54,14 +57,14 @@ model Observation {
   url         String?
   fingerprint String
   observedAt  DateTime
-  firstSeenAt DateTime      @default(now())
-  lastSeenAt  DateTime      @default(now())
+  firstSeenAt DateTime       @default(now())
+  lastSeenAt  DateTime       @default(now())
   metadata    Json?
-  company     Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company     Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   run         MonitoringRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
-
   @@unique([companyId, fingerprint])
   @@index([companyId, observedAt])
+  @@schema("hunt")
 }
 
 model Signal {
@@ -75,6 +78,6 @@ model Signal {
   createdAt                DateTime       @default(now())
   company                  Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   run                      MonitoringRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
-
   @@index([companyId, createdAt])
+  @@schema("hunt")
 }
