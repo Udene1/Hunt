@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { prisma, databaseConfigured } from "../../../lib/db";
 import { COMPANY_CATALOG, findCompany, normalizeCompany } from "../../../lib/companies";
 
@@ -166,104 +167,6 @@ async function persist(
   }
 }
 
-async function persistScan(
-  company: string,
-  observations: Observation[],
-  signal: { score: number; headline: string; detail: string; commercialInterpretation: string } | null
-) {
-  if (!process.env.DATABASE_URL) return { status: "not_connected" as const, persisted: 0 };
-
-  const normalized = company.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  const domain = COMPANY_DOMAINS[company.toLowerCase()] || null;
-
-  try {
-    const result = await prisma.$transaction(async (tx) => {
-      const record = await tx.company.upsert({
-        where: { normalized },
-        create: { name: company, normalized, domain },
-        update: { name: company, domain },
-      });
-
-      const run = await tx.monitoringRun.create({
-        data: { companyId: record.id, status: "running" },
-      });
-
-      let persisted = 0;
-      let errors = 0;
-
-      for (const observation of observations) {
-        const fingerprint =
-          observation.fingerprint ||
-          await sha256(
-            [
-              observation.source,
-              observation.type,
-              observation.category,
-              observation.title,
-              observation.url || "",
-            ].join("|")
-          );
-
-        try {
-          await tx.observation.upsert({
-            where: { companyId_fingerprint: { companyId: record.id, fingerprint } },
-            create: {
-              companyId: record.id,
-              runId: run.id,
-              source: observation.source,
-              type: observation.type,
-              category: observation.category,
-              title: observation.title,
-              url: observation.url,
-              fingerprint,
-              observedAt: new Date(observation.observedAt),
-              metadata: observation.metadata || undefined,
-            },
-            update: {
-              runId: run.id,
-              lastSeenAt: new Date(),
-              observedAt: new Date(observation.observedAt),
-              metadata: observation.metadata || undefined,
-            },
-          });
-          persisted++;
-        } catch {
-          errors++;
-        }
-      }
-
-      if (signal) {
-        await tx.signal.create({
-          data: {
-            companyId: record.id,
-            runId: run.id,
-            score: signal.score,
-            headline: signal.headline,
-            detail: signal.detail,
-            commercialInterpretation: signal.commercialInterpretation,
-          },
-        });
-      }
-
-      await tx.monitoringRun.update({
-        where: { id: run.id },
-        data: {
-          finishedAt: new Date(),
-          status: errors ? "partial" : "completed",
-          observationCount: persisted,
-          errorCount: errors,
-        },
-      });
-
-      return { persisted, errors };
-    });
-
-    return { status: "connected" as const, ...result };
-  } catch (error) {
-    console.error("Hunt persistence failed", error);
-    return { status: "error" as const, persisted: 0, error: "database persistence failed" };
-  }
-}
 
 export async function GET(request: Request) {
   const rawCompany = new URL(request.url).searchParams.get("company")?.trim();
