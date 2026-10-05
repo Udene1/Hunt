@@ -351,6 +351,7 @@ export async function GET(request: Request) {
     ? persistence.newObservationCount > 0
     : null;
 
+  return NextResponse.json({
     company,
     monitoredAt: new Date().toISOString(),
     sources: { jobs: ["Remotive", "Arbeitnow"], website: domain },
