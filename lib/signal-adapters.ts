@@ -200,8 +200,75 @@ const procurementAdapter: SignalAdapter = {
   },
 };
 
+
+const technologyAdapter: SignalAdapter = {
+  id: "technology",
+  async collect(company, domain) {
+    if (!domain) return { observations: [], errors: [] };
+
+    const observations: Observation[] = [];
+    const errors: string[] = [];
+    const normalizedDomain = domain.toLowerCase().replace(/^www\./, "");
+
+    try {
+      const response = await fetch(
+        "https://crt.sh/?q=" + encodeURIComponent("%." + normalizedDomain) + "&output=json",
+        {
+          cache: "no-store",
+          headers: { "user-agent": "Opportunity-Intelligence/0.2 evidence-monitor" },
+        },
+      );
+      if (!response.ok) throw new Error("Certificate transparency unavailable");
+
+      const records = await response.json() as Array<{
+        id?: number;
+        name_value?: string;
+        issuer_name?: string;
+        not_before?: string;
+        not_after?: string;
+      }>;
+
+      const hostnames = new Set<string>();
+      for (const record of records) {
+        for (const rawName of (record.name_value || "").split("\n")) {
+          const hostname = rawName.trim().toLowerCase().replace(/^\*\./, "");
+          if (
+            hostname &&
+            hostname !== normalizedDomain &&
+            hostname.endsWith("." + normalizedDomain)
+          ) {
+            hostnames.add(hostname);
+          }
+        }
+      }
+
+      for (const hostname of hostnames) {
+        observations.push({
+          source: "Certificate Transparency",
+          type: "technology",
+          title: "Public certificate hostname: " + hostname,
+          category: "Technology / infrastructure",
+          url: "https://" + hostname,
+          observedAt: new Date().toISOString(),
+          fingerprint: await sha256("technology|ct-hostname|" + hostname),
+          metadata: { hostname, domain: normalizedDomain },
+        });
+      }
+    } catch {
+      errors.push("Certificate Transparency unavailable");
+    }
+
+    return {
+      observations: Array.from(
+        new Map(observations.map((item) => [item.fingerprint, item])).values(),
+      ),
+      errors,
+    };
+  },
+};
+
 // New signal families should be added here, without changing the monitoring engine.
-export const SIGNAL_ADAPTERS: SignalAdapter[] = [jobAdapter, websiteAdapter, procurementAdapter];
+export const SIGNAL_ADAPTERS: SignalAdapter[] = [jobAdapter, websiteAdapter, procurementAdapter, technologyAdapter];
 
 export async function collectObservations(company: string, domain: string | null) {
   const results = await Promise.all(SIGNAL_ADAPTERS.map((adapter) => adapter.collect(company, domain)));
