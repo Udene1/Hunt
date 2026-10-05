@@ -11,5 +11,9 @@ export const prisma =
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
 export function databaseConfigured() {
-  return Boolean(process.env.DATABASE_URL);
+  return Boolean(
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.POSTGRES_URL
+  );
 }
