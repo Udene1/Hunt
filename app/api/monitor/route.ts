@@ -351,7 +351,6 @@ export async function GET(request: Request) {
     ? persistence.newObservationCount > 0
     : null;
 
-  const persistence = await persistScan(company, unique, signal);\n\n  return NextResponse.json({
     company,
     monitoredAt: new Date().toISOString(),
     sources: { jobs: ["Remotive", "Arbeitnow"], website: domain },
