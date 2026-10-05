@@ -167,7 +167,10 @@ const procurementAdapter: SignalAdapter = {
             .replace(/<[^>]+>/g, " ")
             .replace(/&nbsp;/gi, " ")
             .replace(/&amp;/gi, "&")
+            .replace(/&raquo;/gi, " ")
             .replace(/\s+/g, " ")
+            .trim()
+            .replace(/\s*(?:read more|»)+\s*$/i, "")
             .trim();
           if (!title || !title.toLowerCase().includes(company.toLowerCase())) continue;
 
@@ -181,7 +184,7 @@ const procurementAdapter: SignalAdapter = {
             category: "Procurement",
             url,
             observedAt: new Date().toISOString(),
-            fingerprint: await sha256("procurement|etenders|" + title + "|" + url),
+            fingerprint: await sha256("procurement|etenders|" + url),
           });
         }
       } catch {
