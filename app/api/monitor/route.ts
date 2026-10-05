@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
-import { prisma, databaseConfigured } from "@/lib/db";
-import { COMPANY_CATALOG, findCompany, normalizeCompany } from "@/lib/companies";
+import { prisma, databaseConfigured } from "../../../lib/db";
+import { COMPANY_CATALOG, findCompany, normalizeCompany } from "../../../lib/companies";
 
 type Job = {
   id?: string | number;
