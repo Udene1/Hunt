@@ -171,19 +171,17 @@ export async function GET(request: Request) {
   const seed = findCompany(rawCompany);
   const company = seed?.name || rawCompany;
   const domain = seed?.domain || null;
-  const observations: Observation[] = [];
-  const errors: string[] = [];
-
   const collected = await collectObservations(company, domain);
 
   const unique = Array.from(new Map(collected.observations.map((x) => [x.fingerprint, x])).values());
   const categories = Array.from(new Set(unique.map((x) => x.category)));
   const jobCount = unique.filter((x) => x.type === "job").length;
   const websiteCount = unique.filter((x) => x.type === "website").length;
+  const procurementCount = unique.filter((x) => x.type === "procurement").length;
 
   const signal = unique.length
     ? {
-        score: Math.min(98, 52 + Math.min(jobCount, 8) * 4 + Math.min(websiteCount, 1) * 7 + Math.max(categories.length - 1, 0) * 5),
+        score: Math.min(98, 52 + Math.min(jobCount, 8) * 4 + Math.min(websiteCount, 1) * 7 + Math.min(procurementCount, 4) * 6 + Math.max(categories.length - 1, 0) * 5),
         headline: categories.length > 1 ? "Multi-signal activity detected" : categories[0] + " activity",
         detail: unique.length + " public observation" + (unique.length === 1 ? "" : "s") + " collected across " + (categories.length > 1 ? categories.length + " signal categories." : "the available signal source."),
         commercialInterpretation: categories.includes("Engineering / infrastructure")
@@ -208,7 +206,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     company,
     monitoredAt: new Date().toISOString(),
-    sources: { adapters: collected.adapters, jobs: ["Remotive", "Arbeitnow"], website: domain },
+    sources: { adapters: collected.adapters, website: domain },
     baseline: {
       observationCount: unique.length,
       categories,
