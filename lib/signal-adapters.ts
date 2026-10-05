@@ -242,7 +242,7 @@ const technologyAdapter: SignalAdapter = {
         }
       }
 
-      for (const hostname of hostnames) {
+      for (const hostname of Array.from(hostnames)) {
         observations.push({
           source: "Certificate Transparency",
           type: "technology",
