@@ -192,7 +192,9 @@ export async function GET(request: Request) {
               ? "Potential revenue, partnership or go-to-market demand"
               : categories.includes("Product / operations")
                 ? "Potential product, implementation or operational demand"
-                : categories.includes("Website / product")
+                : categories.includes("Procurement")
+                ? "Potential supplier, implementation, procurement or contract demand"
+              : categories.includes("Website / product")
                   ? "Website evidence captured; persistence will determine whether a product change occurred"
                   : "Potential commercial or operational demand",
       }
