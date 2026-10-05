@@ -91,7 +91,13 @@ async function persist(
   errors: string[],
 ) {
   if (!databaseConfigured()) {
-    return { status: "not_configured", newObservationCount: 0, previousObservationCount: 0 };
+    return {
+      status: "not_configured",
+      newObservationCount: 0,
+      unchangedObservationCount: 0,
+      changedObservationCount: 0,
+      previousObservationCount: 0,
+    };
   }
 
   const normalized = normalizeCompany(company);
