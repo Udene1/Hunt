@@ -136,8 +136,67 @@ const websiteAdapter: SignalAdapter = {
   },
 };
 
+const procurementAdapter: SignalAdapter = {
+  id: "procurement",
+  async collect(company) {
+    const observations: Observation[] = [];
+    const errors: string[] = [];
+    const pages = [
+      "https://www.etenders.com.ng/",
+      "https://www.etenders.com.ng/page/2/",
+      "https://www.etenders.com.ng/page/3/",
+    ];
+
+    for (const page of pages) {
+      try {
+        const response = await fetch(page, {
+          cache: "no-store",
+          headers: { "user-agent": "Opportunity-Intelligence/0.2 evidence-monitor" },
+        });
+        if (!response.ok) throw new Error();
+
+        const html = await response.text();
+        const anchors = Array.from(
+          html.matchAll(/<a[^>]+href=["']([^"']+)["'][^>]*>([\\s\\S]*?)<\\/a>/gi),
+        );
+
+        for (const match of anchors) {
+          const title = match[2]
+            .replace(/<[^>]+>/g, " ")
+            .replace(/&nbsp;/gi, " ")
+            .replace(/&amp;/gi, "&")
+            .replace(/\\s+/g, " ")
+            .trim();
+          if (!title || !title.toLowerCase().includes(company.toLowerCase())) continue;
+
+          const url = match[1].startsWith("http")
+            ? match[1]
+            : new URL(match[1], page).toString();
+          observations.push({
+            source: "eTenders Nigeria",
+            type: "procurement",
+            title,
+            category: "Procurement",
+            url,
+            observedAt: new Date().toISOString(),
+            fingerprint: await sha256("procurement|etenders|" + title + "|" + url),
+          });
+        }
+      } catch {
+        errors.push("eTenders unavailable");
+        break;
+      }
+    }
+
+    return {
+      observations: Array.from(new Map(observations.map((item) => [item.fingerprint, item])).values()),
+      errors: Array.from(new Set(errors)),
+    };
+  },
+};
+
 // New signal families should be added here, without changing the monitoring engine.
-export const SIGNAL_ADAPTERS: SignalAdapter[] = [jobAdapter, websiteAdapter];
+export const SIGNAL_ADAPTERS: SignalAdapter[] = [jobAdapter, websiteAdapter, procurementAdapter];
 
 export async function collectObservations(company: string, domain: string | null) {
   const results = await Promise.all(SIGNAL_ADAPTERS.map((adapter) => adapter.collect(company, domain)));
