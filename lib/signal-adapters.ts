@@ -165,7 +165,7 @@ const procurementAdapter: SignalAdapter = {
             .replace(/<[^>]+>/g, " ")
             .replace(/&nbsp;/gi, " ")
             .replace(/&amp;/gi, "&")
-            .replace(/\\s+/g, " ")
+            .replace(/\s+/g, " ")
             .trim();
           if (!title || !title.toLowerCase().includes(company.toLowerCase())) continue;
 
