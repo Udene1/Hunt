@@ -10,7 +10,7 @@ The dashboard is company-first:
 - Watch a company.
 - Immediately run an evidence scan.
 - Keep a local watchlist until durable storage is connected.
-- Store durable company, watch, observation, monitoring-run and signal records when `DATABASE_URL` is present.
+- Store durable company, watch, observation, monitoring-run and signal records when Neon/Postgres is connected.
 - Detect genuinely new observations using content/job fingerprints.
 - Preserve first-seen and last-seen history instead of treating every scan as a new signal.
 
@@ -42,11 +42,7 @@ Prisma models now define:
 - signal records
 - evidence links and metadata
 
-Connect the Vercel project's Neon PostgreSQL database as `DATABASE_URL`, then run:
-
-```
-npm run db:push
-```
+The Vercel project is connected to Neon PostgreSQL. The production deployment must receive the connected database environment before durable persistence can be verified.
 
 The app still works without the database, but explicitly reports that durable persistence is not configured.
 
