@@ -157,7 +157,7 @@ const procurementAdapter: SignalAdapter = {
 
         const html = await response.text();
         const anchors = Array.from(
-          html.matchAll(/<a[^>]+href=["']([^"']+)["'][^>]*>([\\s\\S]*?)<\\/a>/gi),
+          html.matchAll(/<a\\b[^>]*href=["']([^"']+)["'][^>]*>([\\s\\S]*?)<\\/a>/gi),
         );
 
         for (const match of anchors) {
