@@ -29,6 +29,15 @@ async function persist(
         create: { name: company, normalized, domain },
       });
       const previousObservationCount = await tx.observation.count({ where: { companyId: dbCompany.id } });
+      const baselineObservations = await tx.observation.findMany({
+        where: {
+          companyId: dbCompany.id,
+          observedAt: { gte: new Date(Date.now() - 30 * 86400000) },
+        },
+        select: { category: true, type: true },
+        take: 200,
+      });
+      const baselineCategories = Array.from(new Set(baselineObservations.map((observation) => observation.category)));
       const run = await tx.monitoringRun.create({
         data: { companyId: dbCompany.id, status: "running" },
       });
@@ -82,22 +91,21 @@ async function persist(
         }
       }
 
-      const recent = await tx.observation.findMany({
-        where: {
-          companyId: dbCompany.id,
-          observedAt: { gte: new Date(Date.now() - 30 * 86400000) },
-        },
-        select: { category: true, type: true },
-        take: 200,
-      });
-      const changedCategories = Array.from(new Set([
-        ...observations
+      const changedCategories = Array.from(new Set(
+        changedObservations.map((observation) => observation.category),
+      ));
+      const currentCategories = Array.from(new Set(
+        observations
           .filter((observation) => changedObservations.some((changed) => changed.fingerprint === observation.fingerprint))
           .map((observation) => observation.category),
-      ]));
-      const recentCategories = Array.from(new Set(recent.map((observation) => observation.category)));
-      const clusterCategories = Array.from(new Set([...changedCategories, ...recentCategories]));
-      const clusterStrength = Math.min(3, changedCategories.length) + (clusterCategories.length >= 2 ? 1 : 0);
+      ));
+      const historicalIntersection = currentCategories.filter((category) => baselineCategories.includes(category));
+      const clusterCategories = Array.from(new Set([...currentCategories, ...historicalIntersection]));
+      const hasHistoricalBaseline = previousObservationCount > 0;
+      const crossSignal = hasHistoricalBaseline && (
+        currentCategories.length >= 2 || historicalIntersection.length > 0
+      );
+      const clusterStrength = crossSignal ? Math.min(3, currentCategories.length) + 1 : 0;
 
       if (signal && (newObservationCount > 0 || changedObservationCount > 0)) {
         await tx.signal.create({
@@ -105,9 +113,9 @@ async function persist(
             companyId: dbCompany.id,
             runId: run.id,
             score: Math.min(99, signal.score + clusterStrength * 4),
-            headline: clusterCategories.length >= 2 ? "Cross-signal activity detected" : signal.headline,
-            detail: clusterCategories.length >= 2
-              ? signal.detail + " Recent evidence spans " + clusterCategories.length + " signal categories."
+            headline: crossSignal ? "Cross-signal activity detected" : signal.headline,
+            detail: crossSignal
+              ? signal.detail + " New evidence intersects " + historicalIntersection.length + " established signal categor" + (historicalIntersection.length === 1 ? "y." : "ies.")
               : signal.detail,
             commercialInterpretation: signal.commercialInterpretation,
           },
@@ -132,6 +140,9 @@ async function persist(
         previousObservationCount,
         changedCategories,
         clusterCategories,
+        baselineCategories,
+        historicalIntersection,
+        crossSignal,
       };
     });
     return result;
