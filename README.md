@@ -1,17 +1,18 @@
 # Opportunity Intelligence
 
-A commercial signal engine: continuously detect meaningful changes around companies and turn evidence into actionable sales opportunities.
+A Nigerian company intelligence engine: continuously detect meaningful changes around companies and turn evidence into actionable commercial opportunities.
 
-## Current MVP
+## Current product
 
-- Search the initial company signal feed.
-- Watch companies from the dashboard.
-- Keep the watchlist locally while durable storage is being wired.
-- Run a real evidence scan against public hiring sources (Remotive and Arbeitnow).
-- Run an official-website observation for known company domains.
-- Normalize observations into a generic signal shape: source, type, category, timestamp, URL and fingerprint.
-- Combine observations across signal categories into a deterministic multi-signal score.
-- Preserve fingerprints so durable persistence can later distinguish a new observation from a changed observation.
+The dashboard is company-first:
+
+- Search a catalog of Nigerian companies by name, sector or domain.
+- Watch a company.
+- Immediately run an evidence scan.
+- Keep a local watchlist until durable storage is connected.
+- Store durable company, watch, observation, monitoring-run and signal records when `DATABASE_URL` is present.
+- Detect genuinely new observations using content/job fingerprints.
+- Preserve first-seen and last-seen history instead of treating every scan as a new signal.
 
 ## Signal architecture
 
@@ -29,25 +30,28 @@ The monitor is designed around independent signal types:
 
 A single observation is evidence. A cluster of independent observations is what should become a strong commercial signal.
 
-## Persistence boundary
+## Durable state
 
-The current deployment deliberately does not pretend local state is durable. The API returns normalized observations and fingerprints, but the Vercel project currently has no database connection.
-
-The next infrastructure step is a durable database for:
+Prisma models now define:
 
 - companies and canonical identity
 - watchlists
+- monitoring runs
 - observations and fingerprints
 - first-seen / last-seen state
-- baselines and change events
-- signal clusters and evidence links
-- suppression / tombstones
-- monitoring runs and errors
+- signal records
+- evidence links and metadata
 
-Only after this historical layer exists should model investigation turn clusters into higher-level opportunities.
+Connect the Vercel project's Neon PostgreSQL database as `DATABASE_URL`, then run:
 
-Cashflow OS remains the commercial execution layer; Opportunity Intelligence is the sensing layer.
+```
+npm run db:push
+```
+
+The app still works without the database, but explicitly reports that durable persistence is not configured.
 
 ## Loop
 
 Company → observe → normalize → baseline → detect change → cluster signals → model investigation → opportunity → Cashflow OS
+
+Cashflow OS remains the commercial execution layer. Opportunity Intelligence is the sensing layer.
