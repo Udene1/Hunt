@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma, databaseConfigured } from "../../../lib/db";
+import { prisma, databaseConfigured } from "../../../../lib/db";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
