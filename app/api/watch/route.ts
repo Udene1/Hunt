@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
-import { prisma, databaseConfigured } from "@/lib/db";
-import { findCompany, normalizeCompany, COMPANY_CATALOG } from "@/lib/companies";
+import { prisma, databaseConfigured } from "../../../lib/db";
+import { findCompany, normalizeCompany, COMPANY_CATALOG } from "../../../lib/companies";
 
 export async function GET() {
   if (!databaseConfigured()) return NextResponse.json({ companies: [], persistent: false });
