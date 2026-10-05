@@ -108,16 +108,32 @@ async function persist(
       });
 
       let newObservationCount = 0;
+      let unchangedObservationCount = 0;
+      let changedObservationCount = 0;
+
       for (const observation of observations) {
         const existing = await tx.observation.findUnique({
           where: { companyId_fingerprint: { companyId: dbCompany.id, fingerprint: observation.fingerprint } },
         });
         if (existing) {
+          unchangedObservationCount++;
           await tx.observation.update({
             where: { id: existing.id },
             data: { lastSeenAt: new Date(), observedAt: new Date(observation.observedAt), runId: run.id, metadata: observation.metadata },
           });
         } else {
+          const priorVersions = await tx.observation.findMany({
+            where: {
+              companyId: dbCompany.id,
+              source: observation.source,
+              type: observation.type,
+              url: observation.url,
+            },
+            select: { id: true },
+            take: 1,
+          });
+          if (priorVersions.length) changedObservationCount++;
+
           await tx.observation.create({
             data: {
               companyId: dbCompany.id,
@@ -136,7 +152,7 @@ async function persist(
         }
       }
 
-      if (signal) {
+      if (signal && (newObservationCount > 0 || changedObservationCount > 0)) {
         await tx.signal.create({
           data: {
             companyId: dbCompany.id,
@@ -159,11 +175,27 @@ async function persist(
         },
       });
 
-      return { status: "persisted", newObservationCount, previousObservationCount };
+      return {
+        status: "persisted",
+        newObservationCount,
+        unchangedObservationCount,
+        changedObservationCount,
+        previousObservationCount,
+      };
     });
     return result;
-  } catch {
-    return { status: "database_error", newObservationCount: 0, previousObservationCount: 0 };
+  } catch (error) {
+    console.error(
+      "Hunt persistence error",
+      error instanceof Error ? error.message : String(error),
+    );
+    return {
+      status: "database_error",
+      newObservationCount: 0,
+      unchangedObservationCount: 0,
+      changedObservationCount: 0,
+      previousObservationCount: 0,
+    };
   }
 }
 
@@ -251,7 +283,7 @@ export async function GET(request: Request) {
 
   const persistence = await persist(company, domain, unique, signal, errors);
   const changeDetected = persistence.status === "persisted"
-    ? persistence.newObservationCount > 0
+    ? persistence.newObservationCount > 0 || persistence.changedObservationCount > 0
     : null;
 
   return NextResponse.json({
@@ -266,6 +298,8 @@ export async function GET(request: Request) {
     change: {
       detected: changeDetected,
       newObservationCount: persistence.newObservationCount,
+      unchangedObservationCount: persistence.unchangedObservationCount,
+      changedObservationCount: persistence.changedObservationCount,
       previousObservationCount: persistence.previousObservationCount,
     },
     signal,
