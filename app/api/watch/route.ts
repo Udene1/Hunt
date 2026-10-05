@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { prisma, databaseConfigured } from "../../../lib/db";
 import { findCompany, normalizeCompany, COMPANY_CATALOG } from "../../../lib/companies";
 
