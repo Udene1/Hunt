@@ -141,7 +141,9 @@ const procurementAdapter: SignalAdapter = {
   async collect(company) {
     const observations: Observation[] = [];
     const errors: string[] = [];
+    const search = encodeURIComponent(company);
     const pages = [
+      "https://www.etenders.com.ng/?s=" + search,
       "https://www.etenders.com.ng/",
       "https://www.etenders.com.ng/page/2/",
       "https://www.etenders.com.ng/page/3/",
