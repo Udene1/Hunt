@@ -244,54 +244,9 @@ export async function GET(request: Request) {
   const observations: Observation[] = [];
   const errors: string[] = [];
 
-  try {
-    const r = await fetch("https://remotive.com/api/remote-jobs?search=" + encodeURIComponent(company), { cache: "no-store" });
-    if (!r.ok) throw new Error();
-    const d = await r.json();
-    for (const j of (d.jobs || []) as Job[]) {
-      if (!match(j, company)) continue;
-      const title = j.title || "New hiring signal";
-      const url = j.url || null;
-      observations.push({
-        source: "Remotive",
-        type: "job",
-        title,
-        category: classifyJob(j),
-        url,
-        observedAt: j.created_at || new Date().toISOString(),
-        fingerprint: await sha256("job|remotive|" + title + "|" + String(url || "")),
-      });
-    }
-  } catch {
-    errors.push("Remotive unavailable");
-  }
+  const collected = await collectObservations(company, domain);
 
-  try {
-    const r = await fetch("https://www.arbeitnow.com/api/job-board-api", { cache: "no-store" });
-    if (!r.ok) throw new Error();
-    const d = await r.json();
-    for (const j of (d.data || []) as Job[]) {
-      if (!match(j, company)) continue;
-      const title = j.title || "New hiring signal";
-      const url = j.url || null;
-      observations.push({
-        source: "Arbeitnow",
-        type: "job",
-        title,
-        category: classifyJob(j),
-        url,
-        observedAt: j.created_at || j.date || new Date().toISOString(),
-        fingerprint: await sha256("job|arbeitnow|" + title + "|" + String(url || "")),
-      });
-    }
-  } catch {
-    errors.push("Arbeitnow unavailable");
-  }
-
-  const website = await websiteObservation(company, domain);
-  if (website) observations.push(website);
-
-  const unique = Array.from(new Map(observations.map((x) => [x.fingerprint, x])).values());
+  const unique = Array.from(new Map(collected.observations.map((x) => [x.fingerprint, x])).values());
   const categories = Array.from(new Set(unique.map((x) => x.category)));
   const jobCount = unique.filter((x) => x.type === "job").length;
   const websiteCount = unique.filter((x) => x.type === "website").length;
@@ -315,7 +270,7 @@ export async function GET(request: Request) {
       }
     : null;
 
-  const persistence = await persist(company, domain, unique, signal, errors);
+  const persistence = await persist(company, domain, unique, signal, collected.errors);
   const changeDetected = persistence.status === "persisted"
     ? persistence.newObservationCount > 0 || persistence.changedObservationCount > 0
     : null;
@@ -323,7 +278,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     company,
     monitoredAt: new Date().toISOString(),
-    sources: { jobs: ["Remotive", "Arbeitnow"], website: domain },
+    sources: { adapters: collected.adapters, jobs: ["Remotive", "Arbeitnow"], website: domain },
     baseline: {
       observationCount: unique.length,
       categories,
@@ -338,7 +293,7 @@ export async function GET(request: Request) {
     },
     signal,
     observations: unique.slice(0, 30),
-    errors,
+    errors: collected.errors,
     persistence: {
       status: persistence.status,
       note: persistence.status === "persisted"
