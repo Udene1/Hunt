@@ -299,10 +299,10 @@ const githubAdapter = {
       if (events.activitySnapshot) {
         observations.push({
           source: "GitHub", type: "technology",
-          title: "7-day repository activity: " + repo.full_name,
+          title: "7-day repository activity: " + repo.full_name + " (" + events.activitySnapshot.eventCount + " events)",
           category: "Engineering / GitHub velocity", url: repo.html_url,
           observedAt: events.activitySnapshot.windowEnd,
-          fingerprint: await sha256("github|activity-window|" + repo.id + "|" + events.activitySnapshot.windowStart),
+          fingerprint: await sha256("github|activity-day|" + repo.id + "|" + new Date(now).toISOString().slice(0, 10)),
           metadata: {
             repository: repo.full_name, repositoryId: repo.id,
             windowStart: events.activitySnapshot.windowStart, windowEnd: events.activitySnapshot.windowEnd,
