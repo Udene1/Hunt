@@ -20,6 +20,7 @@ export async function GET(request: Request) {
     prisma.watch.findMany({ include: { company: true }, orderBy: { createdAt: "asc" } }),
     prisma.userWatch.findMany({ include: { company: true }, orderBy: { createdAt: "asc" } }),
   ]);
+
   const companyMap = new Map<string, typeof legacyWatches[number]["company"]>();
   for (const watch of legacyWatches) companyMap.set(watch.company.id, watch.company);
   for (const watch of userWatches) companyMap.set(watch.company.id, watch.company);
@@ -37,15 +38,15 @@ export async function GET(request: Request) {
   const origin = new URL(request.url).origin;
 
   const results = [];
-  for (const watch of selected) {
+  for (const company of selected) {
     try {
-      const response = await fetch(`${origin}/api/monitor?company=${encodeURIComponent(watch.company.name)}`, {
+      const response = await fetch(`${origin}/api/monitor?company=${encodeURIComponent(company.name)}`, {
         cache: "no-store",
         headers: { authorization: `Bearer ${secret}` },
       });
       const data = await response.json().catch(() => ({}));
       results.push({
-        company: watch.name,
+        company: company.name,
         status: response.status,
         change: data.change || null,
         persistence: data.persistence?.status || null,
@@ -53,7 +54,7 @@ export async function GET(request: Request) {
       });
     } catch (error) {
       results.push({
-        company: watch.company.name,
+        company: company.name,
         status: 500,
         error: error instanceof Error ? error.message : String(error),
       });
