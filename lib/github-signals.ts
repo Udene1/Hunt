@@ -228,6 +228,82 @@ async function collectOwnerRepositories(owner: string) {
     : { repos: [] as GitHubRepo[], error: "GitHub owner repositories unavailable" };
 }
 
+type GitHubContent = {
+  name: string;
+  path: string;
+  type: "file" | "dir";
+  sha: string;
+  html_url?: string;
+};
+
+function classifyContentPath(path: string) {
+  const lower = path.toLowerCase();
+  if (/^readme(?:\\.|$)/.test(lower)) return "Documentation / examples";
+  if (/openapi|swagger/.test(lower) || /(^|\\/)api|sdk|client/.test(lower)) return "Engineering / API development";
+  if (/security|dependabot|codeql|secret-scanning|sast|semgrep/.test(lower)) return "Security / engineering";
+  if (/dockerfile|terraform|kubernetes|(^|\\/)k8s|helm|\\.github\\/workflows|\.github\\/actions/.test(lower)) return "Engineering / infrastructure";
+  if (/package\\.json|pyproject\\.toml|requirements\\.txt|go\\.mod|cargo\\.toml/.test(lower)) return "Engineering / platform";
+  if (/docs?|examples?|samples?/.test(lower)) return "Documentation / examples";
+  return "Engineering / repository structure";
+}
+
+async function collectRepoContent(repo: GitHubRepo) {
+  const owner = repo.owner?.login || "";
+  const base = "/repos/" + encodeURIComponent(owner) + "/" + encodeURIComponent(repo.name) + "/contents";
+  const root = await githubFetch<GitHubContent[]>(base);
+  if (!root.data) {
+    return { observations: [] as Observation[], error: root.status === 403 ? "GitHub rate limit reached" : "GitHub repository contents unavailable" };
+  }
+
+  const observations: Observation[] = [];
+  const files = root.data.filter((item) => item.type === "file");
+  const rootInventory = root.data
+    .map((item) => item.type + ":" + item.path + ":" + item.sha)
+    .sort()
+    .join("|");
+
+  observations.push({
+    source: "GitHub",
+    type: "technology",
+    title: "Repository structure snapshot: " + repo.full_name,
+    category: "Engineering / repository structure",
+    url: repo.html_url,
+    observedAt: new Date().toISOString(),
+    fingerprint: await sha256("github|root-structure|" + repo.id + "|" + rootInventory),
+    metadata: {
+      repository: repo.full_name,
+      repositoryId: repo.id,
+      fileCount: files.length,
+      directoryCount: root.data.filter((item) => item.type === "dir").length,
+      paths: root.data.slice(0, 40).map((item) => item.path).join(","),
+    },
+  });
+
+  const interesting = root.data.filter((item) =>
+    item.type === "file" && /^(README(?:\\.[^/]+)?|SECURITY(?:\\.[^/]+)?|package\\.json|pyproject\\.toml|requirements(?:\\.txt)?|go\\.mod|Cargo\\.toml|Dockerfile|openapi(?:\\.(?:json|ya?ml))?|swagger(?:\\.(?:json|ya?ml))?)$/i.test(item.name)
+  ).slice(0, 8);
+
+  for (const item of interesting) {
+    observations.push({
+      source: "GitHub",
+      type: /security|dependabot/i.test(item.path) ? "security" : "technology",
+      title: "Repository file: " + repo.full_name + "/" + item.path,
+      category: classifyContentPath(item.path),
+      url: item.html_url || repo.html_url,
+      observedAt: new Date().toISOString(),
+      fingerprint: await sha256("github|content|" + repo.id + "|" + item.path + "|" + item.sha),
+      metadata: {
+        repository: repo.full_name,
+        repositoryId: repo.id,
+        path: item.path,
+        blobSha: item.sha,
+      },
+    });
+  }
+
+  return { observations, error: null as string | null };
+}
+
 async function collectReleases(repo: GitHubRepo) {
   const result = await githubFetch<GitHubRelease[]>(
     "/repos/" + encodeURIComponent(repo.owner?.login || "") + "/" + encodeURIComponent(repo.name) + "/releases?per_page=3",
@@ -295,14 +371,14 @@ const githubAdapter = {
         collectRepoEvents(repo),
         collectReleases(repo),
       ]);
-      observations.push(...events.observations, ...releases.observations);
+      observations.push(...events.observations, ...releases.observations, ...content.observations);
       if (events.activitySnapshot) {
         observations.push({
           source: "GitHub", type: "technology",
           title: "7-day repository activity: " + repo.full_name + " (" + events.activitySnapshot.eventCount + " events)",
           category: "Engineering / GitHub velocity", url: repo.html_url,
           observedAt: events.activitySnapshot.windowEnd,
-          fingerprint: await sha256("github|activity-day|" + repo.id + "|" + new Date(now).toISOString().slice(0, 10)),
+          fingerprint: await sha256("github|activity-day|" + repo.id + "|" + new Date(events.activitySnapshot.windowEnd).toISOString().slice(0, 10)),
           metadata: {
             repository: repo.full_name, repositoryId: repo.id,
             windowStart: events.activitySnapshot.windowStart, windowEnd: events.activitySnapshot.windowEnd,
@@ -313,7 +389,7 @@ const githubAdapter = {
         });
       }
       if (events.error) errors.push(repo.full_name + ": " + events.error);
-      if (releases.error) errors.push(repo.full_name + ": " + releases.error);
+      if (releases.error) errors.push(repo.full_name + ": " + releases.error);\n      if (content.error) errors.push(repo.full_name + ": " + content.error);
     }
 
     return {
