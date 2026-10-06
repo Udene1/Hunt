@@ -1,0 +1,15 @@
+import { NextResponse } from "next/server";
+import { databaseConfigured, prisma } from "../../../../lib/db";
+import { hashToken } from "../../../../lib/auth";
+export const dynamic="force-dynamic";
+async function authorize(request:Request){
+  if(!databaseConfigured()) return NextResponse.json({error:"Database unavailable"},{status:503});
+  if(!process.env.HUNT_ADMIN_SECRET) return NextResponse.json({error:"Admin service not configured."},{status:503});
+  const h=request.headers.get("authorization")||""; const token=h.startsWith("Bearer ")?h.slice(7).trim():"";
+  if(!token) return NextResponse.json({error:"Admin bearer authentication required."},{status:401,headers:{"www-authenticate":'Bearer realm="Hunt Admin"'}});
+  const access=await prisma.adminAccessToken.findUnique({where:{tokenHash:hashToken(token)}});
+  if(!access||access.revokedAt) return NextResponse.json({error:"Invalid admin bearer token."},{status:401,headers:{"www-authenticate":'Bearer realm="Hunt Admin"'}});
+  await prisma.adminAccessToken.update({where:{id:access.id},data:{lastUsedAt:new Date()}}).catch(()=>{}); return null;
+}
+export async function GET(request:Request){const rejected=await authorize(request);if(rejected)return rejected;const company=new URL(request.url).searchParams.get("company")?.trim();if(!company)return NextResponse.json({error:"company is required."},{status:400});const record=await prisma.company.findFirst({where:{name:{equals:company,mode:"insensitive"}},select:{name:true,domain:true,country:true,generalSummary:true,summaryUpdatedAt:true,summaryEvidenceAt:true,summaryVersion:true}});if(!record)return NextResponse.json({error:"Company not found."},{status:404});return NextResponse.json({company:record});}
+export async function PUT(request:Request){const rejected=await authorize(request);if(rejected)return rejected;const body=await request.json().catch(()=>null);if(!body||typeof body!=="object")return NextResponse.json({error:"Invalid payload."},{status:400});const company=typeof body.company==="string"?body.company.trim():"";const summary=typeof body.summary==="string"?body.summary.trim():"";if(!company||!summary)return NextResponse.json({error:"company and summary are required."},{status:400});if(summary.length>900)return NextResponse.json({error:"Summary must be 900 characters or fewer."},{status:400});const record=await prisma.company.findFirst({where:{name:{equals:company,mode:"insensitive"}},select:{id:true}});if(!record)return NextResponse.json({error:"Company not found."},{status:404});const evidence=await prisma.observation.aggregate({where:{companyId:record.id},_max:{observedAt:true},_count:{_all:true}});const updated=await prisma.company.update({where:{id:record.id},data:{generalSummary:summary,summaryUpdatedAt:new Date(),summaryEvidenceAt:evidence._max.observedAt??null,summaryVersion:{increment:1}},select:{name:true,generalSummary:true,summaryUpdatedAt:true,summaryEvidenceAt:true,summaryVersion:true}});return NextResponse.json({company:updated,evidenceCount:evidence._count._all});}
