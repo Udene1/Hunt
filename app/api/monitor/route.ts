@@ -201,10 +201,11 @@ export async function GET(request: Request) {
   const procurementCount = unique.filter((x) => x.type === "procurement").length;
   const technologyCount = unique.filter((x) => x.type === "technology").length;
   const productSurfaceCount = unique.filter((x) => x.category === "Product / API surface").length;
+  const githubCount = unique.filter((x) => x.source === "GitHub").length;
 
   const signal = unique.length
     ? {
-        score: Math.min(98, 52 + Math.min(jobCount, 8) * 4 + Math.min(websiteCount, 1) * 7 + Math.min(procurementCount, 4) * 6 + Math.min(technologyCount, 6) * 4 + Math.min(productSurfaceCount, 4) * 5 + Math.max(categories.length - 1, 0) * 5),
+        score: Math.min(98, 52 + Math.min(jobCount, 8) * 4 + Math.min(websiteCount, 1) * 7 + Math.min(procurementCount, 4) * 6 + Math.min(technologyCount, 6) * 4 + Math.min(productSurfaceCount, 4) * 5 + Math.min(githubCount, 6) * 3 + Math.max(categories.length - 1, 0) * 5),
         headline: categories.length > 1 ? "Multi-signal activity detected" : categories[0] + " activity",
         detail: unique.length + " public observation" + (unique.length === 1 ? "" : "s") + " collected across " + (categories.length > 1 ? categories.length + " signal categories." : "the available signal source."),
         commercialInterpretation: categories.includes("Engineering / infrastructure")
@@ -221,6 +222,10 @@ export async function GET(request: Request) {
                     ? "Potential platform, infrastructure, API, integration or technical delivery demand"
                     : categories.includes("Product / API surface")
                       ? "Potential API, integration, developer-platform or technical delivery demand"
+                    : categories.includes("Product / release")
+                      ? "Potential product release, integration or technical delivery demand"
+                    : categories.includes("Engineering / GitHub activity")
+                      ? "Potential engineering, platform or developer-ecosystem demand"
                     : categories.includes("Website / product")
                       ? "Website evidence captured; persistence will determine whether a product change occurred"
                       : "Potential commercial or operational demand",
