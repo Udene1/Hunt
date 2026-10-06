@@ -206,6 +206,7 @@ const handler = createMcpHandler(({ requestInfo }) => {
         company: { name: record.name, domain: record.domain, country: record.country, summary: record.generalSummary },
         contacts: record.contacts,
         financials: record.financialRecords.map((f) => ({ ...f, publishedAt: f.publishedAt?.toISOString() || null, observedAt: f.observedAt.toISOString() })),
+        financialStatus: record.financialRecords.length ? "verified_records_available" : "no_verified_financial_statement_found",
         provenanceRule: "Contacts and financial records are source-backed company context. Hunt does not infer private financial health from missing data.",
       };
       return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }], structuredContent: payload };
