@@ -15,7 +15,7 @@ export async function GET(request: Request) {
         where: q ? { OR: [{ name: { contains: q, mode: "insensitive" } }, { domain: { contains: q, mode: "insensitive" } }] } : undefined,
         orderBy: { updatedAt: "desc" },
         take: 100,
-        select: { name: true, domain: true, country: true, updatedAt: true },
+        select: { name: true, domain: true, country: true, updatedAt: true, generalSummary: true },
       });
     } catch {}
   }
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     const key = c.name.toLowerCase();
     const existing = merged.get(key);
     if (existing) {
-      merged.set(key, { ...existing, domain: c.domain || existing.domain, persisted: true });
+      merged.set(key, { ...existing, domain: c.domain || existing.domain, persisted: true, summary: c.generalSummary });
     } else {
       merged.set(key, {
         name: c.name,
