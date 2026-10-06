@@ -1,5 +1,6 @@
 import { detectProductSurfaces, type SurfaceProbe } from "./product-surfaces";
 import { githubAdapter } from "./github-signals";
+import { collectCompanyPeopleAndFinance, type DiscoveredContact, type DiscoveredFinancialRecord } from "./company-people-finance";
 
 export type Observation = {
   source: string;
@@ -16,6 +17,8 @@ export type SignalAdapterResult = {
   observations: Observation[];
   errors: string[];
   probes?: SurfaceProbe[];
+  contacts?: DiscoveredContact[];
+  financials?: DiscoveredFinancialRecord[];
 };
 
 export type SignalAdapter = {
@@ -345,6 +348,14 @@ const technologyAdapter: SignalAdapter = {
   },
 };
 
+const peopleFinanceAdapter: SignalAdapter = {
+  id: "people-finance",
+  async collect(company, domain) {
+    const result = await collectCompanyPeopleAndFinance(company, domain);
+    return { observations: result.observations, errors: result.errors, contacts: result.contacts, financials: result.financials };
+  },
+};
+
 const productSurfaceAdapter: SignalAdapter = {
   id: "product-surfaces",
   async collect(company, domain) {
@@ -360,6 +371,7 @@ export const SIGNAL_ADAPTERS: SignalAdapter[] = [
   technologyAdapter,
   productSurfaceAdapter,
   githubAdapter,
+  peopleFinanceAdapter,
 ];
 
 export async function collectObservations(company: string, domain: string | null) {
@@ -369,5 +381,7 @@ export async function collectObservations(company: string, domain: string | null
     observations: results.flatMap((result) => result.observations),
     errors: results.flatMap((result) => result.errors),
     probes: results.flatMap((result) => result.probes || []),
+    contacts: results.flatMap((result) => result.contacts || []),
+    financials: results.flatMap((result) => result.financials || []),
   };
 }
