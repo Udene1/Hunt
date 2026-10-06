@@ -353,7 +353,7 @@ const peopleFinanceAdapter: SignalAdapter = {
   id: "people-finance",
   async collect(company, domain) {
     const result = await collectCompanyPeopleAndFinance(company, domain);
-    return { observations: result.observations, errors: result.errors, contacts: result.contacts, financials: result.financials };
+    return { observations: result.observations, errors: result.errors, contacts: result.contacts, financials: result.financials, reviewIssues: result.reviewIssues };
   },
 };
 
