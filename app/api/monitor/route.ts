@@ -423,7 +423,7 @@ async function persist(
       try {
         const companyRecord = await prisma.company.findUnique({ where: { normalized }, select: { id: true } });
         if (companyRecord) {
-          const tasks = await createAdminReviewTasks(reviewIssues.map((issue) => ({ ...issue, companyId: companyRecord.id })));
+          const tasks = await createAdminReviewTasks(reviewIssues.map((issue) => ({ ...issue, companyId: companyRecord.id, title: company + ": " + issue.title })));
           for (const task of tasks) await pushAdminReviewAlert(task).catch(() => {});
         }
       } catch (reviewError) {
