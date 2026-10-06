@@ -126,8 +126,6 @@ export async function collectCompanyPeopleAndFinance(company: string, domain: st
       }
 
       const text = clean(html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " "));
-      const email = findEmail(text);
-      const phone = findPhone(text);
       const anchors = Array.from(html.matchAll(/<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi));
       for (const match of anchors) {
         const label = clean(match[2].replace(/<[^>]+>/g, " "));
