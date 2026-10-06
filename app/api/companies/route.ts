@@ -20,7 +20,8 @@ export async function GET(request: Request) {
     } catch {}
   }
 
-  const merged = new Map(companies.map((c) => [c.name.toLowerCase(), { ...c, persisted: false }]));
+  type DirectoryCompany = (typeof COMPANY_CATALOG)[number] & { persisted: boolean; summary?: string | null };
+  const merged = new Map<string, DirectoryCompany>(companies.map((c) => [c.name.toLowerCase(), { ...c, persisted: false }]));
   for (const c of persisted) {
     const key = c.name.toLowerCase();
     const existing = merged.get(key);
