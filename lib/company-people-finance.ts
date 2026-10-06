@@ -63,24 +63,24 @@ function findEmail(text: string) {
 }
 
 function findPhone(text: string) {
-  return text.match(/(?:\\+234|0)[0-9][\\d\\s().-]{7,}/)?.[0]?.replace(/\\s+/g, " ") || null;
+  return text.match(/(?:\+234|0)[0-9][\d\s().-]{7,}/)?.[0]?.replace(/\s+/g, " ") || null;
 }
 
 function extractFinancialMetrics(text: string) {
   const patterns: Array<[string, RegExp]> = [
-    ["revenue", /(?:revenue|turnover)\\s*(?:was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn))?)/i],
-    ["netProfit", /(?:profit after tax|net profit|profit for the year)\\s*(?:was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn))?)/i],
-    ["grossProfit", /gross profit\\s*(?:was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn))?)/i],
-    ["assets", /total assets\\s*(?:were|was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn))?)/i],
-    ["liabilities", /total liabilities\\s*(?:were|was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn))?)/i],
-    ["cash", /(?:cash and cash equivalents|cash equivalents)\\s*(?:were|was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn))?)/i],
-    ["debt", /(?:total debt|borrowings|loans and borrowings)\\s*(?:were|was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn))?)/i],
-    ["equity", /(?:total equity|shareholders' equity|shareholders equity)\\s*(?:was|were|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn))?)/i],
-    ["capex", /(?:capital expenditure|capex)\\s*(?:was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn))?)/i],
+    ["revenue", /(?:revenue|turnover)\s*(?:was|of|:)?\s*(?:₦|NGN|N|USD|US\$|£|EUR|€)?\s*([0-9][0-9,]*(?:\.[0-9]+)?(?:\s*(?:million|billion|m|bn))?)/i],
+    ["netProfit", /(?:profit after tax|net profit|profit for the year)\s*(?:was|of|:)?\s*(?:₦|NGN|N|USD|US\$|£|EUR|€)?\s*([0-9][0-9,]*(?:\.[0-9]+)?(?:\s*(?:million|billion|m|bn))?)/i],
+    ["grossProfit", /gross profit\s*(?:was|of|:)?\s*(?:₦|NGN|N|USD|US\$|£|EUR|€)?\s*([0-9][0-9,]*(?:\.[0-9]+)?(?:\s*(?:million|billion|m|bn))?)/i],
+    ["assets", /total assets\s*(?:were|was|of|:)?\s*(?:₦|NGN|N|USD|US\$|£|EUR|€)?\s*([0-9][0-9,]*(?:\.[0-9]+)?(?:\s*(?:million|billion|m|bn))?)/i],
+    ["liabilities", /total liabilities\s*(?:were|was|of|:)?\s*(?:₦|NGN|N|USD|US\$|£|EUR|€)?\s*([0-9][0-9,]*(?:\.[0-9]+)?(?:\s*(?:million|billion|m|bn))?)/i],
+    ["cash", /(?:cash and cash equivalents|cash equivalents)\s*(?:were|was|of|:)?\s*(?:₦|NGN|N|USD|US\$|£|EUR|€)?\s*([0-9][0-9,]*(?:\.[0-9]+)?(?:\s*(?:million|billion|m|bn))?)/i],
+    ["debt", /(?:total debt|borrowings|loans and borrowings)\s*(?:were|was|of|:)?\s*(?:₦|NGN|N|USD|US\$|£|EUR|€)?\s*([0-9][0-9,]*(?:\.[0-9]+)?(?:\s*(?:million|billion|m|bn))?)/i],
+    ["equity", /(?:total equity|shareholders' equity|shareholders equity)\s*(?:was|were|of|:)?\s*(?:₦|NGN|N|USD|US\$|£|EUR|€)?\s*([0-9][0-9,]*(?:\.[0-9]+)?(?:\s*(?:million|billion|m|bn))?)/i],
+    ["capex", /(?:capital expenditure|capex)\s*(?:was|of|:)?\s*(?:₦|NGN|N|USD|US\$|£|EUR|€)?\s*([0-9][0-9,]*(?:\.[0-9]+)?(?:\s*(?:million|billion|m|bn))?)/i],
   ];
   const metrics: Record<string, string> = {};
   for (const [key, pattern] of patterns) {
-    const value = text.replace(/\\s+/g, " ").match(pattern)?.[1];
+    const value = text.replace(/\s+/g, " ").match(pattern)?.[1];
     if (value) metrics[key] = value.trim();
   }
   return Object.keys(metrics).length ? metrics : null;
@@ -130,7 +130,7 @@ export async function collectCompanyPeopleAndFinance(company: string, domain: st
         });
       }
 
-      const text = clean(html.replace(/<script[\\s\\S]*?<\\/script>/gi, " ").replace(/<style[\\s\\S]*?<\\/style>/gi, " ").replace(/<[^>]+>/g, " "));
+      const text = clean(html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " "));
       const email = findEmail(text);
       const phone = findPhone(text);
       const anchors = Array.from(html.matchAll(/<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi));
