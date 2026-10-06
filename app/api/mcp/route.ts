@@ -183,6 +183,35 @@ const handler = createMcpHandler(({ requestInfo }) => {
     },
   );
 
+  server.registerTool(
+    "get_company_profile",
+    {
+      title: "Get Hunt company profile",
+      description: "Return a company's general summary, durable professional contacts and source-backed financial records. Missing financial data is not treated as evidence of poor financial health.",
+      inputSchema: z.object({ company: z.string().min(1).max(160) }),
+    },
+    async ({ company }) => {
+      const user = requestInfo ? await getBearerUser(requestInfo) : null;
+      if (!user || !monitoringEntitled(user)) return { content: [{ type: "text", text: "Authentication or active pilot/paid access is required." }], isError: true };
+      const record = await prisma.company.findFirst({
+        where: { name: { equals: company, mode: "insensitive" } },
+        select: {
+          name: true, domain: true, country: true, generalSummary: true,
+          contacts: { orderBy: { lastSeenAt: "desc" }, take: 30 },
+          financialRecords: { orderBy: [{ publishedAt: "desc" }, { observedAt: "desc" }], take: 10 },
+        },
+      });
+      if (!record) return { content: [{ type: "text", text: "Company not found in Hunt history." }], isError: true };
+      const payload = {
+        company: { name: record.name, domain: record.domain, country: record.country, summary: record.generalSummary },
+        contacts: record.contacts,
+        financials: record.financialRecords.map((f) => ({ ...f, publishedAt: f.publishedAt?.toISOString() || null, observedAt: f.observedAt.toISOString() })),
+        provenanceRule: "Contacts and financial records are source-backed company context. Hunt does not infer private financial health from missing data.",
+      };
+      return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }], structuredContent: payload };
+    },
+  );
+
   return server;
 }, { legacy: "stateless", responseMode: "json" });
 
