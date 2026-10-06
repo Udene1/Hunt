@@ -176,6 +176,7 @@ const handler = createMcpHandler(({ requestInfo }) => {
           sourceUrl: z.string().url().max(1000).optional(),
           evidenceId: z.string().max(100).optional(),
           confidence: z.number().int().min(0).max(100).optional(),
+          verificationStatus: z.enum(["admin_supplied", "verified", "unverified"]).optional(),
         })).max(100).optional(),
         financials: z.array(z.object({
           period: z.string().min(1).max(80),
@@ -188,6 +189,7 @@ const handler = createMcpHandler(({ requestInfo }) => {
           metrics: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
           evidenceId: z.string().max(100).optional(),
           confidence: z.number().int().min(0).max(100).optional(),
+          verificationStatus: z.enum(["admin_supplied", "verified", "unverified"]).optional(),
         })).max(30).optional(),
       }),
     },
@@ -199,16 +201,16 @@ const handler = createMcpHandler(({ requestInfo }) => {
       for (const item of contacts || []) {
         await prisma.companyContact.upsert({
           where: { companyId_name_role: { companyId: record.id, name: item.name.trim(), role: item.role?.trim() || "" } },
-          create: { companyId: record.id, name: item.name.trim(), role: item.role?.trim() || "", email: item.email?.trim() || null, phone: item.phone?.trim() || null, linkedinUrl: item.linkedinUrl?.trim() || null, source: item.source.trim(), sourceUrl: item.sourceUrl?.trim() || null, evidenceId: item.evidenceId || null, confidence: item.confidence ?? 50 },
-          update: { email: item.email?.trim(), phone: item.phone?.trim(), linkedinUrl: item.linkedinUrl?.trim(), source: item.source.trim(), sourceUrl: item.sourceUrl?.trim(), evidenceId: item.evidenceId, confidence: item.confidence ?? 50, lastSeenAt: new Date() },
+          create: { companyId: record.id, name: item.name.trim(), role: item.role?.trim() || "", email: item.email?.trim() || null, phone: item.phone?.trim() || null, linkedinUrl: item.linkedinUrl?.trim() || null, source: item.source.trim(), sourceUrl: item.sourceUrl?.trim() || null, evidenceId: item.evidenceId || null, confidence: item.confidence ?? 50, verificationStatus: item.verificationStatus ?? "admin_supplied" },
+          update: { email: item.email?.trim(), phone: item.phone?.trim(), linkedinUrl: item.linkedinUrl?.trim(), source: item.source.trim(), sourceUrl: item.sourceUrl?.trim(), evidenceId: item.evidenceId, confidence: item.confidence ?? 50, verificationStatus: item.verificationStatus ?? "admin_supplied", lastSeenAt: new Date() },
         });
       }
       for (const item of financials || []) {
         const date = item.publishedAt ? new Date(item.publishedAt) : null;
         await prisma.financialRecord.upsert({
           where: { companyId_period_statementType_source: { companyId: record.id, period: item.period.trim(), statementType: item.statementType.trim(), source: item.source.trim() } },
-          create: { companyId: record.id, period: item.period.trim(), statementType: item.statementType.trim(), currency: item.currency?.trim() || null, source: item.source.trim(), sourceUrl: item.sourceUrl?.trim() || null, publishedAt: date && !Number.isNaN(date.getTime()) ? date : null, summary: item.summary?.trim() || null, metrics: item.metrics, evidenceId: item.evidenceId || null, confidence: item.confidence ?? 50 },
-          update: { currency: item.currency?.trim(), sourceUrl: item.sourceUrl?.trim(), publishedAt: date && !Number.isNaN(date.getTime()) ? date : undefined, summary: item.summary?.trim(), metrics: item.metrics, evidenceId: item.evidenceId, confidence: item.confidence ?? 50, observedAt: new Date() },
+          create: { companyId: record.id, period: item.period.trim(), statementType: item.statementType.trim(), currency: item.currency?.trim() || null, source: item.source.trim(), sourceUrl: item.sourceUrl?.trim() || null, publishedAt: date && !Number.isNaN(date.getTime()) ? date : null, summary: item.summary?.trim() || null, metrics: item.metrics, evidenceId: item.evidenceId || null, confidence: item.confidence ?? 50, verificationStatus: item.verificationStatus ?? "admin_supplied" },
+          update: { currency: item.currency?.trim(), sourceUrl: item.sourceUrl?.trim(), publishedAt: date && !Number.isNaN(date.getTime()) ? date : undefined, summary: item.summary?.trim(), metrics: item.metrics, evidenceId: item.evidenceId, confidence: item.confidence ?? 50, verificationStatus: item.verificationStatus ?? "admin_supplied", observedAt: new Date() },
         });
       }
       const payload = await prisma.company.findUnique({
