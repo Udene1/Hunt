@@ -221,6 +221,46 @@ const handler = createMcpHandler(({ requestInfo }) => {
     },
   );
 
+  server.registerTool(
+    "get_admin_review_tasks",
+    {
+      title: "Get admin review tasks",
+      description: "Return durable extraction and evidence problems requiring administrator review, including original source URLs.",
+      inputSchema: z.object({ status: z.enum(["open", "resolved", "all"]).optional() }),
+    },
+    async ({ status }) => {
+      const admin = requestInfo ? await getAdminBearer(requestInfo) : null;
+      if (!admin) return { content: [{ type: "text", text: "Admin authentication required." }], isError: true };
+      const tasks = await prisma.adminReviewTask.findMany({
+        where: status === "all" ? {} : { status: status || "open" },
+        orderBy: [{ severity: "asc" }, { createdAt: "desc" }],
+        take: 100,
+        include: { company: { select: { name: true, domain: true } } },
+      });
+      const payload = { tasks };
+      return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }], structuredContent: payload };
+    },
+  );
+
+  server.registerTool(
+    "resolve_admin_review_task",
+    {
+      title: "Resolve admin review task",
+      description: "Mark an administrator review task resolved after handling the underlying evidence issue.",
+      inputSchema: z.object({ id: z.string().min(1), status: z.enum(["open", "resolved"]) }),
+    },
+    async ({ id, status }) => {
+      const admin = requestInfo ? await getAdminBearer(requestInfo) : null;
+      if (!admin) return { content: [{ type: "text", text: "Admin authentication required." }], isError: true };
+      const task = await prisma.adminReviewTask.update({
+        where: { id },
+        data: { status, resolvedAt: status === "resolved" ? new Date() : null, resolvedBy: status === "resolved" ? "admin-agent" : null },
+        include: { company: { select: { name: true, domain: true } } },
+      });
+      return { content: [{ type: "text", text: JSON.stringify(task, null, 2) }], structuredContent: task };
+    },
+  );
+
   return server;
 }, { legacy: "stateless", responseMode: "json" });
 
