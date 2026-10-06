@@ -6,7 +6,7 @@ function urlBase64ToUint8Array(value: string) {
   const padding = "=".repeat((4 - (value.length % 4)) % 4);
   const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
   const raw = atob(base64);
-  return Uint8Array.from([...raw].map((char) => char.charCodeAt(0)));
+  return Uint8Array.from(Array.from(raw, (char) => char.charCodeAt(0)));
 }
 
 export default function AdminReviewTasksPage() {
