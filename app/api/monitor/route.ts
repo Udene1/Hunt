@@ -419,11 +419,15 @@ async function persist(
         })),
       };
     });
-    const companyRecord = await prisma.company.findUnique({ where: { normalized }, select: { id: true } });
-    if (companyRecord && reviewIssues.length) {
-      const tasks = await createAdminReviewTasks(reviewIssues.map((issue) => ({ ...issue, companyId: companyRecord.id })));
-      for (const task of tasks) {
-        await pushAdminReviewAlert(task).catch(() => {});
+    if (reviewIssues.length) {
+      try {
+        const companyRecord = await prisma.company.findUnique({ where: { normalized }, select: { id: true } });
+        if (companyRecord) {
+          const tasks = await createAdminReviewTasks(reviewIssues.map((issue) => ({ ...issue, companyId: companyRecord.id })));
+          for (const task of tasks) await pushAdminReviewAlert(task).catch(() => {});
+        }
+      } catch (reviewError) {
+        console.error("Hunt admin review task error", reviewError instanceof Error ? reviewError.message : String(reviewError));
       }
     }
     return result;
