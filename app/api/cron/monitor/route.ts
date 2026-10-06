@@ -45,7 +45,7 @@ export async function GET(request: Request) {
       });
       const data = await response.json().catch(() => ({}));
       results.push({
-        company: watch.company.name,
+        company: watch.name,
         status: response.status,
         change: data.change || null,
         persistence: data.persistence?.status || null,
