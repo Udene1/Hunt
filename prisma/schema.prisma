@@ -101,6 +101,7 @@ model User {
   sessions         Session[]
   userWatches       UserWatch[]
   pilotCodes        PilotCode[]
+  accessTokens      AccessToken[]
   @@schema("hunt")
 }
 
@@ -158,5 +159,19 @@ model PilotCode {
   redeemedByUserId String?
   redeemedBy       User?    @relation(fields: [redeemedByUserId], references: [id], onDelete: SetNull)
   @@index([expiresAt])
+  @@schema("hunt")
+}
+
+
+model AccessToken {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenHash  String   @unique
+  label      String   @default("MCP")
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, revokedAt])
   @@schema("hunt")
 }
