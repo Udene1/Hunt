@@ -209,53 +209,81 @@ const technologyAdapter: SignalAdapter = {
     const observations: Observation[] = [];
     const errors: string[] = [];
     const normalizedDomain = domain.toLowerCase().replace(/^www\./, "");
+    const hostnames = new Set<string>();
+    let sourceUsed = "";
 
-    try {
-      const response = await fetch(
-        "https://crt.sh/?q=" + encodeURIComponent("%." + normalizedDomain) + "&output=json",
-        {
-          cache: "no-store",
-          headers: { "user-agent": "Opportunity-Intelligence/0.2 evidence-monitor" },
-        },
-      );
-      if (!response.ok) throw new Error("Certificate transparency unavailable");
-
-      const records = await response.json() as Array<{
-        id?: number;
-        name_value?: string;
-        issuer_name?: string;
-        not_before?: string;
-        not_after?: string;
-      }>;
-
-      const hostnames = new Set<string>();
-      for (const record of records) {
-        for (const rawName of (record.name_value || "").split("\n")) {
-          const hostname = rawName.trim().toLowerCase().replace(/^\*\./, "");
-          if (
-            hostname &&
-            hostname !== normalizedDomain &&
-            hostname.endsWith("." + normalizedDomain)
-          ) {
-            hostnames.add(hostname);
-          }
+    const collectNames = (names: string[]) => {
+      for (const rawName of names) {
+        const hostname = rawName.trim().toLowerCase().replace(/^\*\./, "");
+        if (
+          hostname &&
+          hostname !== normalizedDomain &&
+          hostname.endsWith("." + normalizedDomain)
+        ) {
+          hostnames.add(hostname);
         }
       }
+    };
 
-      for (const hostname of Array.from(hostnames)) {
-        observations.push({
-          source: "Certificate Transparency",
-          type: "technology",
-          title: "Public certificate hostname: " + hostname,
-          category: "Technology / infrastructure",
-          url: "https://" + hostname,
-          observedAt: new Date().toISOString(),
-          fingerprint: await sha256("technology|ct-hostname|" + hostname),
-          metadata: { hostname, domain: normalizedDomain },
-        });
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 7000);
+      try {
+        const response = await fetch(
+          "https://crt.sh/?q=" + encodeURIComponent("%." + normalizedDomain) + "&output=json",
+          {
+            signal: controller.signal,
+            cache: "no-store",
+            headers: { "user-agent": "Opportunity-Intelligence/0.2 evidence-monitor" },
+          },
+        );
+        if (!response.ok) throw new Error("crt.sh unavailable");
+
+        const records = await response.json() as Array<{ name_value?: string }>;
+        collectNames(records.flatMap((record) => (record.name_value || "").split("\n")));
+        sourceUsed = "crt.sh";
+      } finally {
+        clearTimeout(timeout);
       }
     } catch {
-      errors.push("Certificate Transparency unavailable");
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 7000);
+        try {
+          const response = await fetch(
+            "https://api.certspotter.com/v1/issuances?domain=" +
+              encodeURIComponent(normalizedDomain) +
+              "&include_subdomains=true&expand=dns_names",
+            {
+              signal: controller.signal,
+              cache: "no-store",
+              headers: { "user-agent": "Opportunity-Intelligence/0.2 evidence-monitor" },
+            },
+          );
+          if (!response.ok) throw new Error("Cert Spotter unavailable");
+
+          const records = await response.json() as Array<{ dns_names?: string[] }>;
+          collectNames(records.flatMap((record) => record.dns_names || []));
+          sourceUsed = "Cert Spotter";
+        } finally {
+          clearTimeout(timeout);
+        }
+      } catch {
+        errors.push("Certificate Transparency unavailable");
+      }
+    }
+
+    for (const hostname of Array.from(hostnames)) {
+      observations.push({
+        source: "Certificate Transparency (" + sourceUsed + ")",
+        type: "technology",
+        title: "Public certificate hostname: " + hostname,
+        category: "Technology / infrastructure",
+        url: "https://" + hostname,
+        observedAt: new Date().toISOString(),
+        fingerprint: await sha256("technology|ct-hostname|" + hostname),
+        metadata: { hostname, domain: normalizedDomain, source: sourceUsed },
+      });
     }
 
     return {
