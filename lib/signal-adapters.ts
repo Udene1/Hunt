@@ -1,3 +1,5 @@
+import { detectProductSurfaces } from "./product-surfaces";
+
 export type Observation = {
   source: string;
   type: "job" | "website" | "product" | "technology" | "security" | "funding" | "leadership" | "regulatory" | "procurement" | "partnership" | "location";
@@ -341,7 +343,21 @@ const technologyAdapter: SignalAdapter = {
   },
 };
 
-export const SIGNAL_ADAPTERS: SignalAdapter[] = [jobAdapter, websiteAdapter, procurementAdapter, technologyAdapter];
+const productSurfaceAdapter: SignalAdapter = {
+  id: "product-surfaces",
+  async collect(company, domain) {
+    if (!domain) return { observations: [], errors: [] };
+    return detectProductSurfaces(domain);
+  },
+};
+
+export const SIGNAL_ADAPTERS: SignalAdapter[] = [
+  jobAdapter,
+  websiteAdapter,
+  procurementAdapter,
+  technologyAdapter,
+  productSurfaceAdapter,
+];
 
 export async function collectObservations(company: string, domain: string | null) {
   const results = await Promise.all(SIGNAL_ADAPTERS.map((adapter) => adapter.collect(company, domain)));
