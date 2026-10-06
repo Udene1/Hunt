@@ -26,6 +26,9 @@ model Company {
   runs         MonitoringRun[]
   signals      Signal[]
   userWatches UserWatch[]
+  clusters    SignalCluster[]
+  opportunities OpportunityCandidate[]
+  notifications Notification[]
   @@schema("hunt")
 }
 
@@ -49,6 +52,7 @@ model MonitoringRun {
   company          Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   observations     Observation[]
   signals          Signal[]
+  clusters         SignalCluster[]
   @@schema("hunt")
 }
 
@@ -105,6 +109,8 @@ model User {
   profile          UserProfile?
   sessions         Session[]
   userWatches       UserWatch[]
+  opportunities     OpportunityCandidate[]
+  notifications     Notification[]
   pilotCodes        PilotCode[]
   accessTokens      AccessToken[]
   @@schema("hunt")
@@ -189,5 +195,69 @@ model AdminAccessToken {
   lastUsedAt DateTime?
   revokedAt  DateTime?
   @@index([revokedAt])
+  @@schema("hunt")
+}
+
+
+model SignalCluster {
+  id           String   @id @default(cuid())
+  companyId    String
+  runId        String?
+  fingerprint  String
+  score        Int
+  headline     String
+  detail       String
+  categories   Json
+  evidenceIds  Json
+  firstSeenAt  DateTime @default(now())
+  lastSeenAt   DateTime @default(now())
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  run          MonitoringRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+  opportunities OpportunityCandidate[]
+  notifications Notification[]
+  @@unique([companyId, fingerprint])
+  @@index([companyId, lastSeenAt])
+  @@schema("hunt")
+}
+
+model OpportunityCandidate {
+  id          String   @id @default(cuid())
+  userId      String
+  companyId   String
+  clusterId   String
+  fingerprint String
+  score       Int
+  reason      String
+  evidenceIds Json
+  status      String   @default("new")
+  investigationState String @default("not_investigated")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company     Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  cluster     SignalCluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+  notifications Notification[]
+  @@unique([userId, fingerprint])
+  @@index([userId, status, updatedAt])
+  @@index([companyId, createdAt])
+  @@schema("hunt")
+}
+
+model Notification {
+  id            String   @id @default(cuid())
+  userId        String
+  companyId     String
+  clusterId     String?
+  opportunityId String?
+  type          String
+  title         String
+  body          String
+  readAt        DateTime?
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  cluster       SignalCluster? @relation(fields: [clusterId], references: [id], onDelete: SetNull)
+  opportunity   OpportunityCandidate? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  @@index([userId, readAt, createdAt])
   @@schema("hunt")
 }
