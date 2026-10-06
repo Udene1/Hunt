@@ -168,7 +168,7 @@ async function discoverGitHubOwners(domain: string | null): Promise<string[]> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 3500);
   try {
-    const response = await fetch("https://" + domain.replace(/^https?:\\/\\//, "").replace(/\\/$/, ""), {
+    const response = await fetch("https://" + domain.replace(/^https?:\/\//, "").replace(/\/$/, ""), {
       signal: controller.signal,
       cache: "no-store",
       redirect: "follow",
@@ -177,7 +177,7 @@ async function discoverGitHubOwners(domain: string | null): Promise<string[]> {
     if (!response.ok) return [];
     const body = (await response.text()).slice(0, 180000);
     const owners = new Set<string>();
-    const re = /https?:\\/\\/github\\.com\\/([A-Za-z0-9_.-]+)(?:[\\/"?#]|$)/gi;
+    const re = /https?:\/\/github\.com\/([A-Za-z0-9_.-]+)(?:[\/"?#]|$)/gi;
     for (const match of body.matchAll(re)) {
       const owner = match[1].trim();
       if (owner && !["features","marketplace","pricing","login","signup","about"].includes(owner.toLowerCase())) owners.add(owner);
