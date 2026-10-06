@@ -30,6 +30,9 @@ const rules: Array<{ type: Observation["type"]; category: string; pattern: RegEx
   { type: "regulatory", category: "Regulatory / compliance", pattern: /licensed|licence|license|regulatory approval|approved by|certified|certification|compliance|regulator|regulatory requirement/i, label: "Regulatory or compliance disclosure" },
   { type: "partnership", category: "Partnership / relationship", pattern: /partnership|partnered with|strategic alliance|collaboration|supplier|customer|client|selected by|appointed as supplier/i, label: "Partnership or commercial relationship disclosure" },
   { type: "location", category: "Expansion / location", pattern: /new office|new branch|new facility|new plant|warehouse|expansion|expanded into|opened in|launch(?:ed)? in|enter(?:ed|ing) the .* market/i, label: "Expansion or location disclosure" },
+  { type: "regulatory", category: "Litigation / dispute", pattern: /litigation|lawsuit|court proceedings|legal proceedings|arbitration|judgment|legal dispute|dispute resolution/i, label: "Legal proceeding or dispute disclosure" },
+  { type: "regulatory", category: "ESG / local content", pattern: /sustainability|environmental|esg|carbon emissions|renewable energy|local content|community investment|community development/i, label: "ESG or local-content disclosure" },
+  { type: "partnership", category: "Competitive landscape", pattern: /competitor|competitive landscape|market share|competes with|rival/i, label: "Competitive landscape disclosure" },
 ];
 
 export const publicSignalAdapter: SignalAdapter = {
