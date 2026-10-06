@@ -1,5 +1,18 @@
 import type { Observation } from "./signal-adapters";
 
+export type SurfaceProbe = {
+  surfaceIdentity: string;
+  domain: string;
+  path: string;
+  label: string;
+  url: string;
+  status: "present" | "missing" | "probe_failed";
+  httpStatus: number | null;
+  evidenceUrl: string | null;
+  checkedAt: string;
+  reason?: string;
+};
+
 const CANDIDATES = [
   { path: "/developers", label: "Developer portal" },
   { path: "/developer", label: "Developer portal" },
@@ -79,8 +92,16 @@ export async function detectProductSurfaces(
     "https://api." + domain,
   ]));
 
+  const probes: SurfaceProbe[] = [];
   const checks = origins.flatMap((origin) => CANDIDATES.map(async (candidate) => {
     const url = new URL(candidate.path, origin + "/").toString();
+    const surfaceIdentity = [
+      "product-surface",
+      domain.toLowerCase(),
+      new URL(url).origin.toLowerCase(),
+      candidate.path,
+    ].join("|");
+    const checkedAt = new Date().toISOString();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3500);
 
@@ -96,13 +117,55 @@ export async function detectProductSurfaces(
         },
       });
 
-      if (response.status < 200 || response.status >= 400) return;
+      if (response.status === 404 || response.status === 410) {
+        probes.push({
+          surfaceIdentity,
+          domain,
+          path: candidate.path,
+          label: candidate.label,
+          url,
+          status: "missing",
+          httpStatus: response.status,
+          evidenceUrl: url,
+          checkedAt,
+          reason: response.status === 410 ? "HTTP 410 Gone" : "HTTP 404 Not Found",
+        });
+        return;
+      }
+
+      if (response.status < 200 || response.status >= 400) {
+        probes.push({
+          surfaceIdentity,
+          domain,
+          path: candidate.path,
+          label: candidate.label,
+          url,
+          status: "probe_failed",
+          httpStatus: response.status,
+          evidenceUrl: url,
+          checkedAt,
+          reason: "HTTP " + response.status,
+        });
+        return;
+      }
 
       const contentType = response.headers.get("content-type") || "";
       const location = response.headers.get("location");
       const evidenceUrl = location
         ? new URL(location, url).toString()
         : url;
+
+      probes.push({
+        surfaceIdentity,
+        domain,
+        path: candidate.path,
+        label: candidate.label,
+        url,
+        status: "present",
+        httpStatus: response.status,
+        evidenceUrl,
+        checkedAt,
+      });
 
       if (response.status >= 300 && response.status < 400 && location) {
         const redirected = new URL(location, url);
@@ -125,12 +188,6 @@ export async function detectProductSurfaces(
       }
 
       const normalizedBody = normalizeDocumentBody(rawBody.slice(0, 120_000), contentType);
-      const surfaceIdentity = [
-        "product-surface",
-        domain.toLowerCase(),
-        new URL(evidenceUrl).origin.toLowerCase(),
-        candidate.path,
-      ].join("|");
       const versionSignature = await sha256([
         response.status,
         contentType.toLowerCase(),
@@ -156,9 +213,19 @@ export async function detectProductSurfaces(
           versionSignature,
         },
       });
-    } catch {
-      // A missing candidate is normal; only aggregate unexpected fetch failures
-      // when the whole origin is inaccessible.
+    } catch (error) {
+      probes.push({
+        surfaceIdentity,
+        domain,
+        path: candidate.path,
+        label: candidate.label,
+        url,
+        status: "probe_failed",
+        httpStatus: null,
+        evidenceUrl: null,
+        checkedAt,
+        reason: error instanceof Error && error.name === "AbortError" ? "timeout" : "network error",
+      });
     } finally {
       clearTimeout(timeout);
     }
@@ -171,6 +238,9 @@ export async function detectProductSurfaces(
       new Map(
         observations.map((item) => [item.fingerprint, item]),
       ).values(),
+    ),
+    probes: Array.from(
+      new Map(probes.map((probe) => [probe.surfaceIdentity, probe])).values(),
     ),
     errors,
   };
