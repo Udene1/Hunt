@@ -52,9 +52,14 @@ function detectCurrency(text: string, url: string) {
 }
 
 function detectPeriod(text: string, url: string) {
-  const matches = (text.slice(0, 50000) + " " + url).match(/20\\d{2}(?:\\s*[-/]\\s*20\\d{2})?/g) || [];
+  const heading = text.slice(0, 12000);
+  const explicit = heading.match(/(?:year ended|for the year ended|financial year ended|year ending)[^\\d]{0,80}(20\\d{2})/i)?.[1];
+  if (explicit) return explicit;
+  const urlYear = url.match(/20\\d{2}(?:[-/]20\\d{2})?/i)?.[0];
+  if (urlYear) return urlYear;
+  const matches = heading.match(/20\\d{2}(?:\\s*[-/]\\s*20\\d{2})?/g) || [];
   const years = Array.from(new Set(matches.map(x => x.replace(/\\s/g, ""))));
-  return years.length === 1 ? years[0] : years.length > 1 ? years.sort().at(-1) || null : null;
+  return years.length === 1 ? years[0] : null;
 }
 
 function detectStatementType(text: string) {
@@ -83,6 +88,7 @@ function extractMetrics(pages: Array<{ page: number; text: string }>) {
       const match = page.text.replace(/\\s+/g, " ").match(pattern);
       if (!match) continue;
       const value = match[1].trim();
+      if (/^20\\d{2}$/.test(value)) continue;
       const idx = page.text.toLowerCase().indexOf(match[0].toLowerCase());
       const snippet = page.text.slice(Math.max(0, idx - 100), Math.min(page.text.length, idx + match[0].length + 120)).replace(/\\s+/g, " ").trim();
       metrics[key] = value;
