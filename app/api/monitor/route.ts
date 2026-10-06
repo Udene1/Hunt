@@ -5,6 +5,7 @@ import { collectObservations, type Observation } from "../../../lib/signal-adapt
 import { requireMonitoringAccess } from "../../../lib/entitlements";
 import type { SurfaceProbe } from "../../../lib/product-surfaces";
 import { scoreCompanyRelevance } from "../../../lib/relevance";
+import { createAdminReviewTasks, pushAdminReviewAlert } from "../../../lib/admin-review";
 
 async function persist(
   company: string,
@@ -15,6 +16,7 @@ async function persist(
   probes: SurfaceProbe[],
   contacts: import("../../../lib/company-people-finance").DiscoveredContact[],
   financials: import("../../../lib/company-people-finance").DiscoveredFinancialRecord[],
+  reviewIssues: import("../../../lib/financial-document-extractor").FinancialDocumentIssue[] = [],
 ) {
   if (!databaseConfigured()) {
     return {
@@ -417,6 +419,13 @@ async function persist(
       };
     });
     return result;
+    const companyRecord = await prisma.company.findUnique({ where: { normalized }, select: { id: true } });
+    if (companyRecord && reviewIssues.length) {
+      const tasks = await createAdminReviewTasks(reviewIssues.map((issue) => ({ ...issue, companyId: companyRecord.id })));
+      for (const task of tasks) {
+        await pushAdminReviewAlert(task).catch(() => {});
+      }
+    }
   } catch (error) {
     console.error(
       "Hunt persistence error",
@@ -505,7 +514,7 @@ export async function GET(request: Request) {
       }
     : null;
 
-  const persistence = await persist(company, domain, unique, signal, collected.errors, collected.probes || [], collected.contacts || [], collected.financials || []);
+  const persistence = await persist(company, domain, unique, signal, collected.errors, collected.probes || [], collected.contacts || [], collected.financials || [], collected.reviewIssues || []);
   const changeDetected = persistence.status === "persisted"
     ? persistence.newObservationCount > 0 || persistence.changedObservationCount > 0 || (persistence.lifecycleEvents?.length || 0) > 0
     : null;
@@ -535,6 +544,7 @@ export async function GET(request: Request) {
     financials: (collected.financials || []).slice(0, 20),
     observations: unique.slice(0, 30),
     errors: collected.errors,
+    adminReview: (collected.reviewIssues || []).map((issue) => ({ type: issue.type, title: issue.title, sourceUrl: issue.sourceUrl })),
     persistence: {
       status: persistence.status,
       note: persistence.status === "persisted"
