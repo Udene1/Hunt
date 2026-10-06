@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { databaseConfigured, prisma } from "../../../lib/db";
-import { COMPANY_CATALOG } from "../../../lib/companies";
+import { COMPANY_CATALOG, type CompanySeed } from "../../../lib/companies";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     } catch {}
   }
 
-  type DirectoryCompany = (typeof COMPANY_CATALOG)[number] & { persisted: boolean; summary?: string | null };
+  type DirectoryCompany = CompanySeed & { persisted: boolean; summary?: string | null };
   const merged = new Map<string, DirectoryCompany>(companies.map((c) => [c.name.toLowerCase(), { ...c, persisted: false }]));
   for (const c of persisted) {
     const key = c.name.toLowerCase();
