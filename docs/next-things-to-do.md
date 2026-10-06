@@ -82,7 +82,17 @@ This file is the working thread for Hunt after the core sensing, evidence, histo
 - [ ] Confirm no manual database intervention is required.
 - [ ] Only after this should the product be treated as pilot-ready.
 
-## Next signal-adapter priorities\n- Leadership / key people movement: feed verified person changes into the contact layer and signal pipeline.\n- Funding / investment: preserve round, investor, date and source evidence without pretending private-company coverage is complete.\n- Regulatory / compliance: start with authoritative Nigerian sources such as SEC, CBN and CAC, then add NDPC, NITDA and FCCPC.\n- Location / expansion and supplier/customer mentions follow after these.\n\n## Architecture rules
+## Next signal-adapter priorities\n- Leadership / key people movement: feed verified person changes into the contact layer and signal pipeline.\n- Funding / investment: preserve round, investor, date and source evidence without pretending private-company coverage is complete.\n- Regulatory / compliance: start with authoritative Nigerian sources such as SEC, CBN and CAC, then add NDPC, NITDA and FCCPC.\n- Location / expansion and supplier/customer mentions follow after these.\n\n## 12. Company contacts + financial records — IMPLEMENTED FOUNDATION
+- [x] Durable CompanyContact records with source, role, confidence and first/last seen timestamps.
+- [x] Durable FinancialRecord records with period, statement type, source, URL, summary and optional structured metrics.
+- [x] Official-site discovery adapter for JSON-LD people, public contact details and annual/financial-report links.
+- [x] Persist contacts and financial records during monitoring.
+- [x] Authenticated HTTP APIs and user MCP tools expose contacts and financial records.
+- [ ] Add richer leadership sources and public-company filing adapters.
+- [ ] Extract verified financial metrics from supported statements; never infer missing numbers.
+- [ ] Add contact/financial presentation to the company evidence UI.
+
+## Architecture rules
 - Hunt observes public reality and preserves evidence/history.
 - Jobs are an adapter, not the product.
 - Evidence is the product.\n- Company context (contacts and financials) must remain source-backed and provenance-preserving.\n- Missing financial information is not evidence of poor financial health.
