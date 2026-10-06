@@ -430,8 +430,16 @@ export async function GET(request: Request) {
   if (!rawCompany) return NextResponse.json({ error: "company is required" }, { status: 400 });
 
   const seed = findCompany(rawCompany);
-  const company = seed?.name || rawCompany;
-  const domain = seed?.domain || null;
+  const cleanedTarget = rawCompany
+    .replace(/^https?:\/\//i, "")
+    .replace(/^www\./i, "")
+    .split("/")[0]
+    .trim();
+  const domainCandidate = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.[a-z]{2,}(?:\.[a-z]{2,})?$/i.test(cleanedTarget)
+    ? cleanedTarget.toLowerCase()
+    : null;
+  const company = seed?.name || (domainCandidate ? cleanedTarget.split(".")[0].replace(/[-_]+/g, " ") : rawCompany);
+  const domain = seed?.domain || domainCandidate;
   const collected = await collectObservations(company, domain);
 
   const unique = Array.from(new Map(collected.observations.map((x) => [x.fingerprint, x])).values());
