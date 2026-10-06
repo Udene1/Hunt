@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser, hashToken } from "../../../../lib/auth";
 import { monitoringEntitled } from "../../../../lib/entitlements";
 import { databaseConfigured, prisma } from "../../../../lib/db";
+import { auditEvent } from "../../../../lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ export async function POST(request: Request) {
     data: { userId: user.id, tokenHash: hashToken(token), label },
     select: { id: true, label: true, createdAt: true },
   });
+  await auditEvent({ userId: user.id, action: "mcp_token_created", resource: "access_token", resourceId: record.id, metadata: { label } });
   return NextResponse.json({ token, accessToken: record, warning: "Copy this token now. Hunt will not show the secret again." }, { status: 201 });
 }
 
@@ -29,5 +31,6 @@ export async function DELETE(request: Request) {
   const id = new URL(request.url).searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
   await prisma.accessToken.updateMany({ where: { id, userId: user.id, revokedAt: null }, data: { revokedAt: new Date() } });
+  await auditEvent({ userId: user.id, action: "mcp_token_revoked", resource: "access_token", resourceId: id });
   return NextResponse.json({ ok: true });
 }
