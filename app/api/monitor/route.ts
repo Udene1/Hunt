@@ -88,6 +88,28 @@ async function persist(
       const run = await tx.monitoringRun.create({
         data: { companyId: dbCompany.id, status: "running" },
       });
+      const priorContacts = await tx.companyContact.findMany({ where: { companyId: dbCompany.id }, select: { name: true, role: true } });
+      for (const contact of contacts) {
+        if (!contact.role) continue;
+        const previousRoles = priorContacts
+          .filter((item) => item.name.trim().toLowerCase() === contact.name.trim().toLowerCase())
+          .map((item) => item.role.trim())
+          .filter(Boolean);
+        const changedFrom = previousRoles.find((role) => role.toLowerCase() !== contact.role!.trim().toLowerCase());
+        if (changedFrom) {
+          const fingerprint = "leadership-movement|" + contact.name.trim().toLowerCase() + "|" + changedFrom.toLowerCase() + "|" + contact.role.trim().toLowerCase();
+          observations.push({
+            source: contact.source,
+            type: "leadership",
+            title: contact.name + " role changed from " + changedFrom + " to " + contact.role,
+            category: "Leadership / key people movement",
+            url: contact.sourceUrl,
+            observedAt: new Date().toISOString(),
+            fingerprint,
+            metadata: { person: contact.name, previousRole: changedFrom, currentRole: contact.role, verificationStatus: contact.verificationStatus },
+          });
+        }
+      }
       const priorSurfaceObservations = await tx.observation.findMany({
         where: { companyId: dbCompany.id, source: "Official public surface" },
         orderBy: { observedAt: "desc" },
