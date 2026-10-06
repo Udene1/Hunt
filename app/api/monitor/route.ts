@@ -37,6 +37,7 @@ async function persist(
         update: { domain: domain || undefined },
         create: { name: company, normalized, domain },
       });
+      const priorContacts = await tx.companyContact.findMany({ where: { companyId: dbCompany.id }, select: { name: true, role: true } });
       for (const contact of contacts) {
         await tx.companyContact.upsert({
           where: { companyId_name_role: { companyId: dbCompany.id, name: contact.name, role: contact.role || "" } },
