@@ -25,7 +25,7 @@ type History = {
   runCount: number;
   signalCount: number;
   runs: { id: string; startedAt: string; finishedAt: string | null; status: string; observationCount: number; errorCount: number }[];
-  observations: { id: string; source: string; type: string; category: string; title: string; url: string | null; observedAt: string; firstSeenAt: string; lastSeenAt: string; metadata: unknown }[];
+  observations: { id: string; source: string; type: string; category: string; title: string; url: string | null; observedAt: string; firstSeenAt: string; lastSeenAt: string; metadata: unknown; status?: string; missCount?: number; lastProbeAt?: string | null; missingSince?: string | null; confirmedRemovedAt?: string | null }[];
   signals: { id: string; score: number; headline: string; detail: string; commercialInterpretation: string; createdAt: string; runId: string | null }[];
 };
 
@@ -184,8 +184,8 @@ export default function Home() {
                   </div>
                   {history[active].observations.map((o) => (
                     <div className="observation" key={o.id}>
-                      <span>{o.source}</span>
-                      <div><b>{o.title}</b><small>{o.category} · first seen {new Date(o.firstSeenAt).toLocaleDateString()} · last seen {new Date(o.lastSeenAt).toLocaleDateString()}</small></div>
+                      <span>{o.status === "confirmed_removed" ? "REMOVED" : o.status === "suspected_missing" ? "CHECKING" : o.source}</span>
+                      <div><b>{o.title}</b><small>{o.category} · first seen {new Date(o.firstSeenAt).toLocaleDateString()} · last seen {new Date(o.lastSeenAt).toLocaleDateString()}{o.status === "confirmed_removed" && o.confirmedRemovedAt ? " · removed " + new Date(o.confirmedRemovedAt).toLocaleDateString() : ""}{o.status === "suspected_missing" ? " · miss " + (o.missCount || 1) + "/2" : ""}</small></div>
                       {o.url && <a href={o.url} target="_blank" rel="noreferrer">Evidence ↗</a>}
                     </div>
                   ))}
