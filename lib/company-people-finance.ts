@@ -22,7 +22,7 @@ export type DiscoveredFinancialRecord = {
   sourceUrl: string;
   publishedAt: string | null;
   summary: string | null;
-  metrics: Record<string, string | number | boolean> | null;
+  metrics: Record<string, unknown> | null;
   evidenceFingerprint: string;
   confidence: number;
   verificationStatus: "verified" | "admin_supplied" | "unverified" | "needs_review";
