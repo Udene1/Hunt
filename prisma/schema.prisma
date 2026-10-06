@@ -20,6 +20,7 @@ model Company {
   observations Observation[]
   runs         MonitoringRun[]
   signals      Signal[]
+  userWatches UserWatch[]
   @@schema("hunt")
 }
 
@@ -98,6 +99,7 @@ model User {
   updatedAt        DateTime      @updatedAt
   profile          UserProfile?
   sessions         Session[]
+  userWatches       UserWatch[]
   @@schema("hunt")
 }
 
