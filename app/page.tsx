@@ -7,6 +7,7 @@ type Company = {
   domain: string;
   description: string;
   sectors: string[];
+  summary?: string | null;
 };
 
 type Monitor = {
@@ -61,6 +62,18 @@ export default function Home() {
     localStorage.setItem("hunt-watchlist", JSON.stringify(watch));
   }, [watch]);
 
+  useEffect(() => {
+    const needle = q.trim();
+    if (!needle) return;
+    const timer = window.setTimeout(() => {
+      fetch("/api/companies?q=" + encodeURIComponent(needle), { cache: "no-store" })
+        .then((r) => r.json())
+        .then((d) => setCompanies(d.companies || []))
+        .catch(() => {});
+    }, 220);
+    return () => window.clearTimeout(timer);
+  }, [q]);
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     if (!needle) return companies;
@@ -69,7 +82,7 @@ export default function Home() {
 
   async function loadProfile(company: string) {
     try {
-      const r = await fetch("/api/company-profile?company=" + encodeURIComponent(company), { cache: "no-store" });
+      const r = await fetch("/api/company-profile?company=" + encodeURIComponent(target), { cache: "no-store" });
       const data = await r.json();
       if (r.ok) setProfiles((p) => ({ ...p, [company]: data }));
     } catch {}
@@ -86,8 +99,10 @@ export default function Home() {
   }
 
   async function runMonitor(company: string) {
-    setLoading(company);
-    setActive(company);
+    const target = company.trim();
+    if (!target) return;
+    setLoading(target);
+    setActive(target);
     try {
       const r = await fetch("/api/monitor?company=" + encodeURIComponent(company), { cache: "no-store" });
       const data = await r.json();
@@ -95,8 +110,8 @@ export default function Home() {
         window.location.href = "/account";
         return;
       }
-      setMonitor((m) => ({ ...m, [company]: data }));
-      await loadHistory(company);
+      setMonitor((m) => ({ ...m, [target]: data }));
+      await loadHistory(target);
     } finally { setLoading(null); }
   }
 
@@ -154,6 +169,19 @@ export default function Home() {
             <h2>{q ? "Companies matching your search" : "Companies worth watching"}</h2>
             <span>{filtered.length} COMPANIES</span>
           </div>
+
+          {q.trim() && filtered.length === 0 && (
+            <article className="card">
+              <div className="cardTop">
+                <div><h3>Discover “{q.trim()}”</h3><strong>NOT IN HUNT YET</strong></div>
+                <div className="score" style={{ fontSize: 14, fontWeight: 500 }}>NEW</div>
+              </div>
+              <p>This company is not in Hunt’s stored directory yet. Start an evidence scan and Hunt will register it, collect the available public signals, and preserve the first observation as its baseline.</p>
+              <button className="watch" onClick={() => runMonitor(q.trim())}>
+                {loading === q.trim() ? "Scanning…" : "Scan & register company →"}
+              </button>
+            </article>
+          )}
 
           {filtered.map((company) => (
             <article key={company.name} className="card">
