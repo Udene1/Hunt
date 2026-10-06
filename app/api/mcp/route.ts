@@ -78,6 +78,39 @@ const handler = createMcpHandler(({ requestInfo }) => {
   );
 
   server.registerTool(
+    "get_company_changes",
+    {
+      title: "Get Hunt company changes",
+      description: "Return change-focused durable evidence: recent evidence, confirmed removals, signal clusters and recent signals. Hunt reports what changed; the connected AI investigates meaning.",
+      inputSchema: z.object({ company: z.string().min(1).max(160) }),
+    },
+    async ({ company }) => {
+      const user = requestInfo ? await getBearerUser(requestInfo) : null;
+      if (!user || !monitoringEntitled(user)) {
+        return { content: [{ type: "text", text: "Authentication or active pilot/paid access is required." }], isError: true };
+      }
+      const record = await prisma.company.findFirst({
+        where: { name: { equals: company, mode: "insensitive" } },
+        include: {
+          observations: { orderBy: { observedAt: "desc" }, take: 100 },
+          clusters: { orderBy: { lastSeenAt: "desc" }, take: 20 },
+          signals: { orderBy: { createdAt: "desc" }, take: 20 },
+        },
+      });
+      if (!record) return { content: [{ type: "text", text: "Company not found in Hunt history." }], isError: true };
+      const payload = {
+        company: { name: record.name, domain: record.domain, summary: record.generalSummary },
+        recentEvidence: record.observations.slice(0, 25).map((o) => ({ id:o.id,title:o.title,category:o.category,source:o.source,url:o.url,status:o.status,observedAt:o.observedAt.toISOString(),firstSeenAt:o.firstSeenAt.toISOString(),lastSeenAt:o.lastSeenAt.toISOString() })),
+        removedEvidence: record.observations.filter((o) => o.status === "confirmed_removed").slice(0, 20).map((o) => ({ id:o.id,title:o.title,category:o.category,url:o.url,confirmedRemovedAt:o.confirmedRemovedAt?.toISOString() || null })),
+        clusters: record.clusters.map((c) => ({ id:c.id,score:c.score,headline:c.headline,detail:c.detail,categories:c.categories,evidenceIds:c.evidenceIds,lastSeenAt:c.lastSeenAt.toISOString() })),
+        signals: record.signals.map((s) => ({ id:s.id,score:s.score,headline:s.headline,detail:s.detail,commercialInterpretation:s.commercialInterpretation,createdAt:s.createdAt.toISOString() })),
+        evidenceRule: "Changes and clusters are deterministic evidence structures. External AI remains responsible for commercial interpretation and investigation.",
+      };
+      return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }], structuredContent: payload };
+    },
+  );
+
+  server.registerTool(
     "assess_company_relevance",
     {
       title: "Assess company relevance",
