@@ -20,6 +20,51 @@ function samePath(url: string, path: string) {
   }
 }
 
+function normalizeDocumentBody(body: string, contentType: string) {
+  if (contentType.includes("application/json") || /(^|[\s,{])(?:openapi|swagger|paths|components)(?:[\s:},]|$)/i.test(body)) {
+    try {
+      const value = JSON.parse(body);
+      return JSON.stringify(sortJson(value));
+    } catch {
+      // YAML or malformed JSON: fall through to normalized text.
+    }
+  }
+
+  const visible = body
+    .replace(/<script[\\s\\S]*?<\/script>/gi, " ")
+    .replace(/<style[\\s\\S]*?<\/style>/gi, " ")
+    .replace(/<!--[\\s\\S]*?-->/g, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+  return visible.slice(0, 30000);
+}
+
+function sortJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortJson);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, item]) => [key, sortJson(item)]),
+    );
+  }
+  return value;
+}
+
+async function sha256(value: string) {
+  return crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  ).then((digest) =>
+    Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join(""),
+  );
+}
+
 export async function detectProductSurfaces(
   domain: string,
   baseUrl = "https://" + domain,
@@ -59,14 +104,13 @@ export async function detectProductSurfaces(
         ? new URL(location, url).toString()
         : url;
 
-      // A redirect to a known candidate is still evidence, but a generic
-      // redirect back to the homepage is not enough to call this a product surface.
       if (response.status >= 300 && response.status < 400 && location) {
         const redirected = new URL(location, url);
         if (samePath(redirected.toString(), "/")) return;
       }
 
-      const body = (await response.text()).slice(0, 120_000).toLowerCase();
+      const rawBody = await response.text();
+      const body = rawBody.slice(0, 120_000).toLowerCase();
       const strongApiEvidence =
         candidate.label.includes("API") ||
         candidate.label.includes("OpenAPI") ||
@@ -80,6 +124,21 @@ export async function detectProductSurfaces(
         if (looksLikeWebApp) return;
       }
 
+      const normalizedBody = normalizeDocumentBody(rawBody.slice(0, 120_000), contentType);
+      const surfaceIdentity = [
+        "product-surface",
+        domain.toLowerCase(),
+        new URL(evidenceUrl).origin.toLowerCase(),
+        candidate.path,
+      ].join("|");
+      const versionSignature = await sha256([
+        response.status,
+        contentType.toLowerCase(),
+        evidenceUrl,
+        normalizedBody,
+      ].join("|"));
+      const fingerprint = await sha256(surfaceIdentity + "|version|" + versionSignature);
+
       observations.push({
         source: "Official public surface",
         type: "product",
@@ -87,17 +146,14 @@ export async function detectProductSurfaces(
         category: "Product / API surface",
         url: evidenceUrl,
         observedAt: new Date().toISOString(),
-        fingerprint: await crypto.subtle.digest(
-          "SHA-256",
-          new TextEncoder().encode("product-surface|" + domain.toLowerCase() + "|" + candidate.path),
-        ).then((digest) =>
-          Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join(""),
-        ),
+        fingerprint,
         metadata: {
           domain,
           path: candidate.path,
           status: response.status,
           contentType,
+          surfaceIdentity,
+          versionSignature,
         },
       });
     } catch {
@@ -111,7 +167,11 @@ export async function detectProductSurfaces(
   await Promise.all(checks);
 
   return {
-    observations: Array.from(new Map(observations.map((item) => [item.fingerprint, item])).values()),
+    observations: Array.from(
+      new Map(
+        observations.map((item) => [item.fingerprint, item]),
+      ).values(),
+    ),
     errors,
   };
 }
