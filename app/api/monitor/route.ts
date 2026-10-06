@@ -62,7 +62,7 @@ async function persist(
             currency: financial.currency, sourceUrl: financial.sourceUrl,
             publishedAt: financial.publishedAt ? new Date(financial.publishedAt) : null,
             observedAt: new Date(), summary: financial.summary, metrics: financial.metrics,
-            confidence: financial.confidence, verificationStatus: financial.verificationStatus, verificationStatus: financial.verificationStatus,
+            confidence: financial.confidence, verificationStatus: financial.verificationStatus,
           },
           create: {
             companyId: dbCompany.id, period: financial.period,
@@ -70,7 +70,7 @@ async function persist(
             source: financial.source, sourceUrl: financial.sourceUrl,
             publishedAt: financial.publishedAt ? new Date(financial.publishedAt) : null,
             observedAt: new Date(), summary: financial.summary, metrics: financial.metrics,
-            confidence: financial.confidence,
+            confidence: financial.confidence, verificationStatus: financial.verificationStatus,
           },
         });
       }
