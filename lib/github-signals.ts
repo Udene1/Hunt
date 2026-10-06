@@ -238,11 +238,11 @@ type GitHubContent = {
 
 function classifyContentPath(path: string) {
   const lower = path.toLowerCase();
-  if (/^readme(?:\\.|$)/.test(lower)) return "Documentation / examples";
-  if (/openapi|swagger/.test(lower) || /(^|\\/)api|sdk|client/.test(lower)) return "Engineering / API development";
+  if (lower.startsWith("readme")) return "Documentation / examples";
+  if (/openapi|swagger/.test(lower) || /(^|\/)api|sdk|client/.test(lower)) return "Engineering / API development";
   if (/security|dependabot|codeql|secret-scanning|sast|semgrep/.test(lower)) return "Security / engineering";
-  if (/dockerfile|terraform|kubernetes|(^|\\/)k8s|helm|\\.github\\/workflows|\.github\\/actions/.test(lower)) return "Engineering / infrastructure";
-  if (/package\\.json|pyproject\\.toml|requirements\\.txt|go\\.mod|cargo\\.toml/.test(lower)) return "Engineering / platform";
+  if (/dockerfile|terraform|kubernetes|(^|\/)k8s|helm|\.github\/workflows|\.github\/actions/.test(lower)) return "Engineering / infrastructure";
+  if (/package\.json|pyproject\.toml|requirements\.txt|go\.mod|cargo\.toml/.test(lower)) return "Engineering / platform";
   if (/docs?|examples?|samples?/.test(lower)) return "Documentation / examples";
   return "Engineering / repository structure";
 }
