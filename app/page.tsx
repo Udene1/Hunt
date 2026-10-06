@@ -259,6 +259,9 @@ export default function Home() {
                           <div>
                             <b>{financial.summary || financial.statementType}</b>
                             <small>{financial.currency || "Currency not stated"} · {financial.statementType}{financial.publishedAt ? " · published " + new Date(financial.publishedAt).toLocaleDateString() : ""}</small>
+                            {financial.sourceUrl && (
+                              <small><a href={financial.sourceUrl} target="_blank" rel="noreferrer">Open original source document</a></small>
+                            )}
                             {financial.metrics && (
                               <small>
                                 {["revenue","netProfit","grossProfit","assets","liabilities","cash","debt","equity","capex"].filter((key) => financial.metrics?.[key] != null).map((key) => key + ": " + String(financial.metrics?.[key])).join(" · ")}
