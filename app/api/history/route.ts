@@ -49,6 +49,11 @@ export async function GET(request: Request) {
           firstSeenAt: true,
           lastSeenAt: true,
           metadata: true,
+          status: true,
+          missCount: true,
+          lastProbeAt: true,
+          missingSince: true,
+          confirmedRemovedAt: true,
         },
       }),
       prisma.signal.findMany({
