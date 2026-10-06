@@ -149,7 +149,7 @@ export default function Home() {
                 <div><h3>{company.name}</h3><strong>{company.sectors.slice(0, 3).join(" · ")}</strong></div>
                 <div className="score" style={{ fontSize: 14, fontWeight: 500 }}>NG</div>
               </div>
-              <p>{company.description}</p>
+              <p>{company.summary || company.description}</p>
               <div className="tags">{company.sectors.map((tag) => <span key={tag}>{tag}</span>)}</div>
               {monitor[company.name]?.signal && (
                 <div className="why"><b>Latest detected signal · {monitor[company.name].signal!.score}</b>{monitor[company.name].signal!.headline} — {monitor[company.name].signal!.commercialInterpretation}</div>
