@@ -40,13 +40,13 @@ async function persist(
           where: { companyId_name_role: { companyId: dbCompany.id, name: contact.name, role: contact.role } },
           update: {
             email: contact.email, phone: contact.phone, linkedinUrl: contact.linkedinUrl,
-            source: contact.source, sourceUrl: contact.sourceUrl, confidence: contact.confidence,
+            source: contact.source, sourceUrl: contact.sourceUrl, confidence: contact.confidence, verificationStatus: contact.verificationStatus,
             lastSeenAt: new Date(),
           },
           create: {
             companyId: dbCompany.id, name: contact.name, role: contact.role,
             email: contact.email, phone: contact.phone, linkedinUrl: contact.linkedinUrl,
-            source: contact.source, sourceUrl: contact.sourceUrl, confidence: contact.confidence,
+            source: contact.source, sourceUrl: contact.sourceUrl, confidence: contact.confidence, verificationStatus: contact.verificationStatus,
           },
         });
       }
@@ -62,7 +62,7 @@ async function persist(
             currency: financial.currency, sourceUrl: financial.sourceUrl,
             publishedAt: financial.publishedAt ? new Date(financial.publishedAt) : null,
             observedAt: new Date(), summary: financial.summary, metrics: financial.metrics,
-            confidence: financial.confidence,
+            confidence: financial.confidence, verificationStatus: financial.verificationStatus, verificationStatus: financial.verificationStatus,
           },
           create: {
             companyId: dbCompany.id, period: financial.period,
