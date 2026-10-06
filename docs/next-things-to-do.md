@@ -2,7 +2,7 @@
 
 This file is the working thread for Hunt after the core sensing, evidence, history, auth, MCP, and admin-summary foundations.
 
-## 1. Finish Prisma production migration — IN PROGRESS
+## 0. Company intelligence profile — IMPLEMENTED FOUNDATION\n- [x] Durable professional contacts with source, evidence link, confidence and freshness.\n- [x] Durable financial records with reporting period, statement type, source, publication date, summary and optional metrics.\n- [x] Public company profile endpoint and UI context section.\n- [x] User MCP exposes company profile context.\n- [x] Private admin API/MCP can curate source-backed contacts and financial records.\n- [ ] Add automated leadership/key-person movement adapter.\n- [ ] Add verified financial-document discovery adapters for public-company sources.\n\n## 1. Finish Prisma production migration — IN PROGRESS
 - [x] Add a full initial baseline migration for the existing Neon hunt schema.
 - [ ] One-time production action: mark 00000000000000_init as applied.
 - [ ] One-time production action: mark 20261006_admin_summary_and_access_tokens as applied.
@@ -82,10 +82,10 @@ This file is the working thread for Hunt after the core sensing, evidence, histo
 - [ ] Confirm no manual database intervention is required.
 - [ ] Only after this should the product be treated as pilot-ready.
 
-## Architecture rules
+## Next signal-adapter priorities\n- Leadership / key people movement: feed verified person changes into the contact layer and signal pipeline.\n- Funding / investment: preserve round, investor, date and source evidence without pretending private-company coverage is complete.\n- Regulatory / compliance: start with authoritative Nigerian sources such as SEC, CBN and CAC, then add NDPC, NITDA and FCCPC.\n- Location / expansion and supplier/customer mentions follow after these.\n\n## Architecture rules
 - Hunt observes public reality and preserves evidence/history.
 - Jobs are an adapter, not the product.
-- Evidence is the product.
+- Evidence is the product.\n- Company context (contacts and financials) must remain source-backed and provenance-preserving.\n- Missing financial information is not evidence of poor financial health.
 - External AI investigates and interprets.
 - No LLM/model API key inside Hunt.
 - Cashflow OS integration remains deferred until Hunt works standalone.
