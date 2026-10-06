@@ -42,7 +42,8 @@ export default function Home() {
   const [profiles, setProfiles] = useState<Record<string, CompanyProfile>>({});
   const [loading, setLoading] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState<string | null>(null);
-  const [watchPersistent, setWatchPersistent] = useState(false);\n  const autoScanTargets = useRef(new Set<string>());
+  const [watchPersistent, setWatchPersistent] = useState(false);
+  const autoScanTargets = useRef(new Set<string>());
 
   useEffect(() => {
     fetch("/api/companies").then((r) => r.json()).then((d) => setCompanies(d.companies || [])).catch(() => {});
@@ -68,7 +69,18 @@ export default function Home() {
     const timer = window.setTimeout(() => {
       fetch("/api/companies?q=" + encodeURIComponent(needle), { cache: "no-store" })
         .then((r) => r.json())
-        .then((d) => setCompanies(d.companies || []))
+        .then((d) => {
+          const results = d.companies || [];
+          setCompanies(results);
+          if (
+            needle.length >= 3 &&
+            results.length === 0 &&
+            !autoScanTargets.current.has(needle.toLowerCase())
+          ) {
+            autoScanTargets.current.add(needle.toLowerCase());
+            void runMonitor(needle);
+          }
+        })
         .catch(() => {});
     }, 220);
     return () => window.clearTimeout(timer);
