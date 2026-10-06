@@ -52,10 +52,32 @@ async function persist(
           where: { companyId_fingerprint: { companyId: dbCompany.id, fingerprint: observation.fingerprint } },
         });
         if (existing) {
-          unchangedObservationCount++;
+          const classificationChanged =
+            existing.category !== observation.category ||
+            existing.title !== observation.title ||
+            existing.source !== observation.source ||
+            existing.url !== observation.url;
+
+          if (classificationChanged) {
+            changedObservationCount++;
+            changedObservations.push(observation);
+          } else {
+            unchangedObservationCount++;
+          }
+
           await tx.observation.update({
             where: { id: existing.id },
-            data: { lastSeenAt: new Date(), observedAt: new Date(observation.observedAt), runId: run.id, metadata: observation.metadata },
+            data: {
+              lastSeenAt: new Date(),
+              observedAt: new Date(observation.observedAt),
+              runId: run.id,
+              source: observation.source,
+              type: observation.type,
+              category: observation.category,
+              title: observation.title,
+              url: observation.url,
+              metadata: observation.metadata,
+            },
           });
         } else {
           const priorVersions = await tx.observation.findMany({
@@ -163,7 +185,6 @@ async function persist(
   }
 }
 
-
 export async function GET(request: Request) {
   const rawCompany = new URL(request.url).searchParams.get("company")?.trim();
   if (!rawCompany) return NextResponse.json({ error: "company is required" }, { status: 400 });
@@ -194,12 +215,12 @@ export async function GET(request: Request) {
               : categories.includes("Product / operations")
                 ? "Potential product, implementation or operational demand"
                 : categories.includes("Procurement")
-                ? "Potential supplier, implementation, procurement or contract demand"
-              : categories.includes("Technology / infrastructure")
-                ? "Potential platform, infrastructure, API, integration or technical delivery demand"
-              : categories.includes("Website / product")
-                  ? "Website evidence captured; persistence will determine whether a product change occurred"
-                  : "Potential commercial or operational demand",
+                  ? "Potential supplier, implementation, procurement or contract demand"
+                  : categories.includes("Technology / infrastructure")
+                    ? "Potential platform, infrastructure, API, integration or technical delivery demand"
+                    : categories.includes("Website / product")
+                      ? "Website evidence captured; persistence will determine whether a product change occurred"
+                      : "Potential commercial or operational demand",
       }
     : null;
 
