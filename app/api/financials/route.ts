@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   if (!company) return NextResponse.json({ error: "company is required" }, { status: 400 });
   const record = await prisma.company.findFirst({
     where: { name: { equals: company, mode: "insensitive" } },
-    select: { name: true, domain: true, financialRecords: { orderBy: [{ publishedAt: "desc" }, { observedAt: "desc" }], take: 50 } },
+    select: { name: true, domain: true, financialRecords: { where: { verificationStatus: "verified" }, orderBy: [{ publishedAt: "desc" }, { observedAt: "desc" }], take: 50 } },
   });
   if (!record) return NextResponse.json({ error: "Company not found in Hunt history." }, { status: 404 });
   return NextResponse.json({ ...record, latest: record.financialRecords[0] || null });
