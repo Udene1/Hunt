@@ -169,7 +169,7 @@ export async function collectCompanyPeopleAndFinance(company: string, domain: st
           source: "Official website", sourceUrl: href, publishedAt: null,
           summary: label || "Financial report",
           metrics, evidenceFingerprint: fingerprint, confidence: 88,
-          verificationStatus: document?.issues.some((issue) => issue.type === "pdf_extraction_failed" || issue.type === "pdf_scanned") ? "needs_review" : "verified",
+          verificationStatus: document?.issues.length ? "needs_review" : "verified",
         });
         observations.push({
           source: "Official website",
