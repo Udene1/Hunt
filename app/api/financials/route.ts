@@ -13,5 +13,5 @@ export async function GET(request: Request) {
     select: { name: true, domain: true, financialRecords: { where: { verificationStatus: "verified" }, orderBy: [{ publishedAt: "desc" }, { observedAt: "desc" }], take: 50 } },
   });
   if (!record) return NextResponse.json({ error: "Company not found in Hunt history." }, { status: 404 });
-  return NextResponse.json({ ...record, latest: record.financialRecords[0] || null });
+  return NextResponse.json({ ...record, latest: record.financialRecords[0] || null, verification: record.financialRecords.length ? "verified_records_available" : "no_verified_financial_statement_found" });
 }
