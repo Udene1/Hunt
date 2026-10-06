@@ -212,6 +212,46 @@ const handler = createMcpHandler(({ requestInfo }) => {
     },
   );
 
+  server.registerTool(
+    "get_company_contacts",
+    {
+      title: "Get Hunt company contacts",
+      description: "Return publicly discovered company contacts and leadership details preserved by Hunt. Contact data comes from public evidence; the connected AI decides who is commercially relevant.",
+      inputSchema: z.object({ company: z.string().min(1).max(160) }),
+    },
+    async ({ company }) => {
+      const user = requestInfo ? await getBearerUser(requestInfo) : null;
+      if (!user || !monitoringEntitled(user)) return { content: [{ type: "text", text: "Authentication or active pilot/paid access is required." }], isError: true };
+      const record = await prisma.company.findFirst({
+        where: { name: { equals: company, mode: "insensitive" } },
+        select: { name: true, domain: true, contacts: { orderBy: { lastSeenAt: "desc" }, take: 100 } },
+      });
+      if (!record) return { content: [{ type: "text", text: "Company not found in Hunt history." }], isError: true };
+      const payload = { company: { name: record.name, domain: record.domain }, contacts: record.contacts };
+      return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }], structuredContent: payload };
+    },
+  );
+
+  server.registerTool(
+    "get_company_financials",
+    {
+      title: "Get Hunt company financial records",
+      description: "Return the latest public financial statement/report records Hunt has discovered for a company, including source and any structured metrics available.",
+      inputSchema: z.object({ company: z.string().min(1).max(160) }),
+    },
+    async ({ company }) => {
+      const user = requestInfo ? await getBearerUser(requestInfo) : null;
+      if (!user || !monitoringEntitled(user)) return { content: [{ type: "text", text: "Authentication or active pilot/paid access is required." }], isError: true };
+      const record = await prisma.company.findFirst({
+        where: { name: { equals: company, mode: "insensitive" } },
+        select: { name: true, domain: true, financialRecords: { orderBy: [{ publishedAt: "desc" }, { observedAt: "desc" }], take: 50 } },
+      });
+      if (!record) return { content: [{ type: "text", text: "Company not found in Hunt history." }], isError: true };
+      const payload = { company: { name: record.name, domain: record.domain }, latest: record.financialRecords[0] || null, records: record.financialRecords };
+      return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }], structuredContent: payload };
+    },
+  );
+
   return server;
 }, { legacy: "stateless", responseMode: "json" });
 
