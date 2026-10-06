@@ -225,7 +225,7 @@ const handler = createMcpHandler(({ requestInfo }) => {
       if (!user || !monitoringEntitled(user)) return { content: [{ type: "text", text: "Authentication or active pilot/paid access is required." }], isError: true };
       const record = await prisma.company.findFirst({
         where: { name: { equals: company, mode: "insensitive" } },
-        select: { name: true, domain: true, contacts: { orderBy: { lastSeenAt: "desc" }, take: 100 } },
+        select: { name: true, domain: true, contacts: { where: { verificationStatus: "verified" }, orderBy: { lastSeenAt: "desc" }, take: 100 } },
       });
       if (!record) return { content: [{ type: "text", text: "Company not found in Hunt history." }], isError: true };
       const payload = { company: { name: record.name, domain: record.domain }, contacts: record.contacts };
@@ -245,7 +245,7 @@ const handler = createMcpHandler(({ requestInfo }) => {
       if (!user || !monitoringEntitled(user)) return { content: [{ type: "text", text: "Authentication or active pilot/paid access is required." }], isError: true };
       const record = await prisma.company.findFirst({
         where: { name: { equals: company, mode: "insensitive" } },
-        select: { name: true, domain: true, financialRecords: { orderBy: [{ publishedAt: "desc" }, { observedAt: "desc" }], take: 50 } },
+        select: { name: true, domain: true, financialRecords: { where: { verificationStatus: "verified" }, orderBy: [{ publishedAt: "desc" }, { observedAt: "desc" }], take: 50 } },
       });
       if (!record) return { content: [{ type: "text", text: "Company not found in Hunt history." }], isError: true };
       const payload = { company: { name: record.name, domain: record.domain }, latest: record.financialRecords[0] || null, records: record.financialRecords };
