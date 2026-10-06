@@ -65,17 +65,17 @@ This file is the working thread for Hunt after the core sensing, evidence, histo
 - [x] Expose opportunity and notification feeds in the account UI.
 - [ ] Later add MCP events/tasks, web push and email delivery.
 
-## 10. Production hardening — PARTIALLY IMPLEMENTED
+## 10. Production hardening — IMPLEMENTED FOUNDATION / LIVE VERIFICATION PENDING
 - [x] MCP request size limit.
 - [x] MCP host/origin allowlists when configured.
 - [x] Lightweight per-instance MCP rate limiting.
 - [x] Existing bearer token revocation/expiry checks remain authoritative.
 - [x] Adapter timeouts are already used on external probes.
-- [ ] Durable audit-event trail.
+- [x] Durable audit-event trail for MCP token lifecycle.
 - [ ] Production observability/error alerting.
 - [ ] Final database/index review after live migration.
 
-## 11. Run the complete real-user product test — READY / PRODUCTION VERIFICATION PENDING
+## 11. Run the complete real-user product test — BLOCKED ON DEPLOYMENT QUOTA / PRODUCTION MIGRATION
 - [x] Code path exists for register -> profile -> pilot -> browse -> watch -> monitor -> durable history -> MCP investigation -> admin summary -> public summary.
 - [x] Opportunity and notification paths are now part of the product loop.
 - [ ] Verify the complete loop against the newly deployed production build and Neon migration.
