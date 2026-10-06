@@ -178,7 +178,8 @@ async function discoverGitHubOwners(domain: string | null): Promise<string[]> {
     const body = (await response.text()).slice(0, 180000);
     const owners = new Set<string>();
     const re = /https?:\/\/github\.com\/([A-Za-z0-9_.-]+)(?:[\/"?#]|$)/gi;
-    for (const match of body.matchAll(re)) {
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(body)) !== null) {
       const owner = match[1].trim();
       if (owner && !["features","marketplace","pricing","login","signup","about"].includes(owner.toLowerCase())) owners.add(owner);
     }
