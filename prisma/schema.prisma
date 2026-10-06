@@ -59,8 +59,13 @@ model Observation {
   observedAt  DateTime
   firstSeenAt DateTime       @default(now())
   lastSeenAt  DateTime       @default(now())
-  metadata    Json?
-  company     Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  metadata           Json?
+  status             String   @default("active")
+  missCount          Int      @default(0)
+  lastProbeAt        DateTime?
+  missingSince       DateTime?
+  confirmedRemovedAt DateTime?
+  company            Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   run         MonitoringRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
   @@unique([companyId, fingerprint])
   @@index([companyId, observedAt])
