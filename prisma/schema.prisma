@@ -16,6 +16,10 @@ model Company {
   country      String        @default("NG")
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+  generalSummary String?
+  summaryUpdatedAt DateTime?
+  summaryEvidenceAt DateTime?
+  summaryVersion Int @default(0)
   watches      Watch[]
   observations Observation[]
   runs         MonitoringRun[]
@@ -173,5 +177,16 @@ model AccessToken {
   revokedAt  DateTime?
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([userId, revokedAt])
+  @@schema("hunt")
+}
+
+model AdminAccessToken {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  label      String   @default("Admin AI")
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  @@index([revokedAt])
   @@schema("hunt")
 }
