@@ -27,6 +27,8 @@ export default function AccountPage() {
   const [redeeming, setRedeeming] = useState(false);
   const [mcpToken, setMcpToken] = useState("");
   const [tokenBusy, setTokenBusy] = useState(false);
+  const [opportunities, setOpportunities] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
 
   useEffect(() => {
     fetch("/api/auth/me", { cache: "no-store" }).then(async (r) => {
@@ -34,6 +36,10 @@ export default function AccountPage() {
       const data = await r.json();
       setUser(data.user);
       setProfile(data.profile || {});
+      if (data.user?.plan === "pilot" || data.user?.plan === "paid") {
+        fetch("/api/opportunities").then((r) => r.ok ? r.json() : null).then((d) => setOpportunities(d?.opportunities || [])).catch(() => {});
+        fetch("/api/notifications").then((r) => r.ok ? r.json() : null).then((d) => setNotifications(d?.notifications || [])).catch(() => {});
+      }
     }).catch(() => {});
   }, []);
 
@@ -146,6 +152,20 @@ export default function AccountPage() {
               <button className="watch" type="submit">{redeeming ? "Activating…" : "Activate pilot →"}</button>
             </form>
           )}
+          <div className="card">
+            <p className="eyebrow">OPPORTUNITY FEED</p>
+            <h2>{opportunities.length} candidates · {notifications.filter((n) => !n.readAt).length} unread</h2>
+            <p>These are deterministic evidence matches, not sales decisions. Open the evidence or ask your connected AI to investigate.</p>
+            {opportunities.slice(0, 8).map((o) => (
+              <div className="observation" key={o.id}><span>{o.score}</span><div><b>{o.company?.name}</b><small>{o.reason}</small></div><Link href={"/?company=" + encodeURIComponent(o.company?.name || "")}>Evidence ↗</Link></div>
+            ))}
+            {!opportunities.length && <div className="empty">No opportunity candidates yet. Watch companies and let monitoring establish intersections.</div>}
+          </div>
+          <div className="card">
+            <p className="eyebrow">NOTIFICATIONS</p>
+            {notifications.slice(0, 8).map((n) => <div className="observation" key={n.id}><span>{n.readAt ? "READ" : "NEW"}</span><div><b>{n.title}</b><small>{n.body} · {new Date(n.createdAt).toLocaleString()}</small></div></div>)}
+            {!notifications.length && <div className="empty">No notifications yet.</div>}
+          </div>
           <div className="card">
             <p className="eyebrow">AI CONNECTION</p>
             <h2>Hunt MCP</h2>
