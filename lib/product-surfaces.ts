@@ -27,8 +27,15 @@ export async function detectProductSurfaces(
   const observations: Observation[] = [];
   const errors: string[] = [];
 
-  const checks = CANDIDATES.map(async (candidate) => {
-    const url = new URL(candidate.path, baseUrl).toString();
+  const origins = Array.from(new Set([
+    baseUrl.replace(/\/$/, ""),
+    "https://developer." + domain,
+    "https://docs." + domain,
+    "https://api." + domain,
+  ]));
+
+  const checks = origins.flatMap((origin) => CANDIDATES.map(async (candidate) => {
+    const url = new URL(candidate.path, origin + "/").toString();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3500);
 
@@ -99,7 +106,7 @@ export async function detectProductSurfaces(
     } finally {
       clearTimeout(timeout);
     }
-  });
+  }));
 
   await Promise.all(checks);
 
