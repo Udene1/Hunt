@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma, databaseConfigured } from "../../../lib/db";
 import { findCompany, normalizeCompany } from "../../../lib/companies";
 import { collectObservations, type Observation } from "../../../lib/signal-adapters";
+import { requireMonitoringAccess } from "../../../lib/entitlements";
 import type { SurfaceProbe } from "../../../lib/product-surfaces";
 
 async function persist(
@@ -308,6 +309,18 @@ async function persist(
 }
 
 export async function GET(request: Request) {
+  const cronSecret = process.env.CRON_SECRET;
+  const internal = Boolean(cronSecret && request.headers.get("authorization") === `Bearer ${cronSecret}`);
+  if (!internal) {
+    const access = await requireMonitoringAccess();
+    if (!access.allowed) {
+      return NextResponse.json(
+        { error: access.reason === "authentication_required" ? "Authentication required." : "Monitoring is available to pilot and paid accounts.", code: access.reason },
+        { status: access.reason === "authentication_required" ? 401 : 402 },
+      );
+    }
+  }
+
   const rawCompany = new URL(request.url).searchParams.get("company")?.trim();
   if (!rawCompany) return NextResponse.json({ error: "company is required" }, { status: 400 });
 
