@@ -102,9 +102,9 @@ async function persist(
               metadata: observation.metadata,
               status: "active",
               missCount: 0,
-              lastProbeAt: new Date(),
-              missingSince: null,
-              confirmedRemovedAt: null,
+              lastProbeAt: observation.source === "Official public surface" ? new Date() : existing.lastProbeAt,
+              missingSince: observation.source === "Official public surface" ? null : existing.missingSince,
+              confirmedRemovedAt: observation.source === "Official public surface" ? null : existing.confirmedRemovedAt,
             },
           });
           const identity = observation.metadata && "surfaceIdentity" in observation.metadata
@@ -144,7 +144,7 @@ async function persist(
               metadata: observation.metadata,
               status: "active",
               missCount: 0,
-              lastProbeAt: new Date(),
+              lastProbeAt: observation.source === "Official public surface" ? new Date() : null,
             },
           });
           const identity = observation.metadata && "surfaceIdentity" in observation.metadata
