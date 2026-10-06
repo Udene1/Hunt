@@ -91,7 +91,6 @@ async function persist(
       const run = await tx.monitoringRun.create({
         data: { companyId: dbCompany.id, status: "running" },
       });
-      const priorContacts = await tx.companyContact.findMany({ where: { companyId: dbCompany.id }, select: { name: true, role: true } });
       for (const contact of contacts) {
         if (!contact.role) continue;
         const previousRoles = priorContacts
