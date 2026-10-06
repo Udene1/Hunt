@@ -39,7 +39,7 @@ function fingerprint(value: string) {
 }
 
 function clean(value: string) {
-  return value.replace(/\\s+/g, " ").trim();
+  return value.replace(/\s+/g, " ").trim();
 }
 
 function detectCurrency(text: string, url: string) {
@@ -53,12 +53,12 @@ function detectCurrency(text: string, url: string) {
 
 function detectPeriod(text: string, url: string) {
   const heading = text.slice(0, 12000);
-  const explicit = heading.match(/(?:year ended|for the year ended|financial year ended|year ending)[^\\d]{0,80}(20\\d{2})/i)?.[1];
+  const explicit = heading.match(/(?:year ended|for the year ended|financial year ended|year ending)[^\d]{0,80}(20\d{2})/i)?.[1];
   if (explicit) return explicit;
-  const urlYear = url.match(/20\\d{2}(?:[-/]20\\d{2})?/i)?.[0];
+  const urlYear = url.match(/20\d{2}(?:[-/]20\d{2})?/i)?.[0];
   if (urlYear) return urlYear;
-  const matches = heading.match(/20\\d{2}(?:\\s*[-/]\\s*20\\d{2})?/g) || [];
-  const years = Array.from(new Set(matches.map(x => x.replace(/\\s/g, ""))));
+  const matches = heading.match(/20\d{2}(?:\s*[-/]\s*20\d{2})?/g) || [];
+  const years = Array.from(new Set(matches.map(x => x.replace(/\s/g, ""))));
   return years.length === 1 ? years[0] : null;
 }
 
@@ -71,26 +71,26 @@ function detectStatementType(text: string) {
 
 function extractMetrics(pages: Array<{ page: number; text: string }>) {
   const patterns: Array<[string, RegExp]> = [
-    ["revenue", /(?:revenue|turnover)\\s+(?:was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn|thousand|k))?)/i],
-    ["netProfit", /(?:profit after tax|net profit|profit for the year)\\s+(?:was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn|thousand|k))?)/i],
-    ["grossProfit", /gross profit\\s+(?:was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn|thousand|k))?)/i],
-    ["assets", /total assets\\s+(?:were|was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn|thousand|k))?)/i],
-    ["liabilities", /total liabilities\\s+(?:were|was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn|thousand|k))?)/i],
-    ["cash", /(?:cash and cash equivalents|cash equivalents)\\s+(?:were|was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn|thousand|k))?)/i],
-    ["debt", /(?:total debt|borrowings|loans and borrowings)\\s+(?:were|was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn|thousand|k))?)/i],
-    ["equity", /(?:total equity|shareholders'? equity)\\s+(?:was|were|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn|thousand|k))?)/i],
-    ["capex", /(?:capital expenditure|capex)\\s+(?:was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn|thousand|k))?)/i],
+    ["revenue", /(?:revenue|turnover)\s+(?:was|of|:)?\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\s*(?:million|billion|m|bn|thousand|k))?)/i],
+    ["netProfit", /(?:profit after tax|net profit|profit for the year)\s+(?:was|of|:)?\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\s*(?:million|billion|m|bn|thousand|k))?)/i],
+    ["grossProfit", /gross profit\s+(?:was|of|:)?\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\s*(?:million|billion|m|bn|thousand|k))?)/i],
+    ["assets", /total assets\s+(?:were|was|of|:)?\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\.[0-9]+)?(?:\s*(?:million|billion|m|bn|thousand|k))?)/i],
+    ["liabilities", /total liabilities\s+(?:were|was|of|:)?\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\s*(?:million|billion|m|bn|thousand|k))?)/i],
+    ["cash", /(?:cash and cash equivalents|cash equivalents)\s+(?:were|was|of|:)?\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\s*(?:million|billion|m|bn|thousand|k))?)/i],
+    ["debt", /(?:total debt|borrowings|loans and borrowings)\s+(?:were|was|of|:)?\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\s*(?:million|billion|m|bn|thousand|k))?)/i],
+    ["equity", /(?:total equity|shareholders'? equity)\s+(?:was|were|of|:)?\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\s*(?:million|billion|m|bn|thousand|k))?)/i],
+    ["capex", /(?:capital expenditure|capex)\s+(?:was|of|:)?\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\s*(?:million|billion|m|bn|thousand|k))?)/i],
   ];
   const evidence: Record<string, FinancialMetricEvidence> = {};
   const metrics: Record<string, string> = {};
   for (const [key, pattern] of patterns) {
     for (const page of pages) {
-      const match = page.text.replace(/\\s+/g, " ").match(pattern);
+      const match = page.text.replace(/\s+/g, " ").match(pattern);
       if (!match) continue;
       const value = match[1].trim();
-      if (/^20\\d{2}$/.test(value)) continue;
+      if (/^20\d{2}$/.test(value)) continue;
       const idx = page.text.toLowerCase().indexOf(match[0].toLowerCase());
-      const snippet = page.text.slice(Math.max(0, idx - 100), Math.min(page.text.length, idx + match[0].length + 120)).replace(/\\s+/g, " ").trim();
+      const snippet = page.text.slice(Math.max(0, idx - 100), Math.min(page.text.length, idx + match[0].length + 120)).replace(/\s+/g, " ").trim();
       metrics[key] = value;
       evidence[key] = { value, page: page.page, evidence: snippet, confidence: 84, status: "verified" };
       break;
