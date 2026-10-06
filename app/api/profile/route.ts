@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { getCurrentUser } from "../../../lib/auth";
 import { databaseConfigured, prisma } from "../../../lib/db";
 
-const jsonOrNull = (value: unknown) => value === undefined ? undefined : value;
+const jsonValue = (value: unknown) => {
+  if (value === undefined) return undefined;
+  if (value === null) return Prisma.JsonNull;
+  return value as Prisma.InputJsonValue;
+};
 
 export const dynamic = "force-dynamic";
 
@@ -26,25 +31,25 @@ export async function PUT(request: Request) {
     create: {
       userId: user.id,
       profession: typeof body.profession === "string" ? body.profession.trim() || null : null,
-      services: jsonOrNull(body.services),
-      industries: jsonOrNull(body.industries),
+      services: jsonValue(body.services),
+      industries: jsonValue(body.industries),
       geography: typeof body.geography === "string" ? body.geography.trim() || null : null,
       idealCustomer: typeof body.idealCustomer === "string" ? body.idealCustomer.trim() || null : null,
-      targetCompanies: jsonOrNull(body.targetCompanies),
-      desiredSignals: jsonOrNull(body.desiredSignals),
-      exclusions: jsonOrNull(body.exclusions),
-      commercialObjectives: jsonOrNull(body.commercialObjectives),
+      targetCompanies: jsonValue(body.targetCompanies),
+      desiredSignals: jsonValue(body.desiredSignals),
+      exclusions: jsonValue(body.exclusions),
+      commercialObjectives: jsonValue(body.commercialObjectives),
     },
     update: {
       profession: typeof body.profession === "string" ? body.profession.trim() || null : null,
-      services: jsonOrNull(body.services),
-      industries: jsonOrNull(body.industries),
+      services: jsonValue(body.services),
+      industries: jsonValue(body.industries),
       geography: typeof body.geography === "string" ? body.geography.trim() || null : null,
       idealCustomer: typeof body.idealCustomer === "string" ? body.idealCustomer.trim() || null : null,
-      targetCompanies: jsonOrNull(body.targetCompanies),
-      desiredSignals: jsonOrNull(body.desiredSignals),
-      exclusions: jsonOrNull(body.exclusions),
-      commercialObjectives: jsonOrNull(body.commercialObjectives),
+      targetCompanies: jsonValue(body.targetCompanies),
+      desiredSignals: jsonValue(body.desiredSignals),
+      exclusions: jsonValue(body.exclusions),
+      commercialObjectives: jsonValue(body.commercialObjectives),
     },
   });
 
