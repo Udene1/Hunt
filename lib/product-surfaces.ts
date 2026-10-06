@@ -81,7 +81,7 @@ async function sha256(value: string) {
 export async function detectProductSurfaces(
   domain: string,
   baseUrl = "https://" + domain,
-): Promise<{ observations: Observation[]; errors: string[] }> {
+): Promise<{ observations: Observation[]; errors: string[]; probes: SurfaceProbe[] }> {
   const observations: Observation[] = [];
   const errors: string[] = [];
 
