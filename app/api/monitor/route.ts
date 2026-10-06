@@ -13,6 +13,8 @@ async function persist(
   signal: { score: number; headline: string; detail: string; commercialInterpretation: string } | null,
   errors: string[],
   probes: SurfaceProbe[],
+  contacts: import("../../../lib/company-people-finance").DiscoveredContact[],
+  financials: import("../../../lib/company-people-finance").DiscoveredFinancialRecord[],
 ) {
   if (!databaseConfigured()) {
     return {
@@ -33,6 +35,46 @@ async function persist(
         update: { domain: domain || undefined },
         create: { name: company, normalized, domain },
       });
+      for (const contact of contacts) {
+        await tx.companyContact.upsert({
+          where: { companyId_name_role: { companyId: dbCompany.id, name: contact.name, role: contact.role } },
+          update: {
+            email: contact.email, phone: contact.phone, linkedinUrl: contact.linkedinUrl,
+            source: contact.source, sourceUrl: contact.sourceUrl, confidence: contact.confidence,
+            lastSeenAt: new Date(),
+          },
+          create: {
+            companyId: dbCompany.id, name: contact.name, role: contact.role,
+            email: contact.email, phone: contact.phone, linkedinUrl: contact.linkedinUrl,
+            source: contact.source, sourceUrl: contact.sourceUrl, confidence: contact.confidence,
+          },
+        });
+      }
+      for (const financial of financials) {
+        await tx.financialRecord.upsert({
+          where: {
+            companyId_period_statementType_source: {
+              companyId: dbCompany.id, period: financial.period,
+              statementType: financial.statementType, source: financial.source,
+            },
+          },
+          update: {
+            currency: financial.currency, sourceUrl: financial.sourceUrl,
+            publishedAt: financial.publishedAt ? new Date(financial.publishedAt) : null,
+            observedAt: new Date(), summary: financial.summary, metrics: financial.metrics,
+            confidence: financial.confidence,
+          },
+          create: {
+            companyId: dbCompany.id, period: financial.period,
+            statementType: financial.statementType, currency: financial.currency,
+            source: financial.source, sourceUrl: financial.sourceUrl,
+            publishedAt: financial.publishedAt ? new Date(financial.publishedAt) : null,
+            observedAt: new Date(), summary: financial.summary, metrics: financial.metrics,
+            confidence: financial.confidence,
+          },
+        });
+      }
+
       const previousObservationCount = await tx.observation.count({ where: { companyId: dbCompany.id } });
       const baselineObservations = await tx.observation.findMany({
         where: {
@@ -433,7 +475,7 @@ export async function GET(request: Request) {
       }
     : null;
 
-  const persistence = await persist(company, domain, unique, signal, collected.errors, collected.probes || []);
+  const persistence = await persist(company, domain, unique, signal, collected.errors, collected.probes || [], collected.contacts || [], collected.financials || []);
   const changeDetected = persistence.status === "persisted"
     ? persistence.newObservationCount > 0 || persistence.changedObservationCount > 0 || (persistence.lifecycleEvents?.length || 0) > 0
     : null;
@@ -459,6 +501,8 @@ export async function GET(request: Request) {
     cluster: persistence.cluster || null,
     opportunityCount: persistence.opportunityCount || 0,
     signal,
+    contacts: (collected.contacts || []).slice(0, 20),
+    financials: (collected.financials || []).slice(0, 20),
     observations: unique.slice(0, 30),
     errors: collected.errors,
     persistence: {
