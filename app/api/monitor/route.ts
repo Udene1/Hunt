@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma, databaseConfigured } from "../../../lib/db";
 import { findCompany, normalizeCompany } from "../../../lib/companies";
 import { collectObservations, type Observation } from "../../../lib/signal-adapters";
+import type { SurfaceProbe } from "../../../lib/product-surfaces";
 
 async function persist(
   company: string,
@@ -9,6 +10,7 @@ async function persist(
   observations: Observation[],
   signal: { score: number; headline: string; detail: string; commercialInterpretation: string } | null,
   errors: string[],
+  probes: SurfaceProbe[],
 ) {
   if (!databaseConfigured()) {
     return {
@@ -41,17 +43,37 @@ async function persist(
       const run = await tx.monitoringRun.create({
         data: { companyId: dbCompany.id, status: "running" },
       });
+      const priorSurfaceObservations = await tx.observation.findMany({
+        where: { companyId: dbCompany.id, source: "Official public surface" },
+        orderBy: { observedAt: "desc" },
+        take: 500,
+      });
+      const latestSurfaceByIdentity = new Map<string, typeof priorSurfaceObservations[number]>();
+      for (const row of priorSurfaceObservations) {
+        const metadata = row.metadata;
+        const identity = metadata && typeof metadata === "object" && !Array.isArray(metadata)
+          ? String((metadata as Record<string, unknown>).surfaceIdentity || "")
+          : "";
+        if (identity && !latestSurfaceByIdentity.has(identity)) latestSurfaceByIdentity.set(identity, row);
+      }
 
       let newObservationCount = 0;
       let unchangedObservationCount = 0;
       let changedObservationCount = 0;
       const changedObservations: Observation[] = [];
+      const lifecycleEvents: Array<{
+        kind: "removed" | "restored";
+        probe: SurfaceProbe;
+        observationId: string;
+        missCount?: number;
+      }> = [];
 
       for (const observation of observations) {
         const existing = await tx.observation.findUnique({
           where: { companyId_fingerprint: { companyId: dbCompany.id, fingerprint: observation.fingerprint } },
         });
         if (existing) {
+          const priorStatus = existing.status;
           const classificationChanged =
             existing.category !== observation.category ||
             existing.title !== observation.title ||
@@ -77,8 +99,20 @@ async function persist(
               title: observation.title,
               url: observation.url,
               metadata: observation.metadata,
+              status: "active",
+              missCount: 0,
+              lastProbeAt: new Date(),
+              missingSince: null,
+              confirmedRemovedAt: null,
             },
           });
+          const identity = observation.metadata && "surfaceIdentity" in observation.metadata
+            ? String(observation.metadata.surfaceIdentity || "")
+            : "";
+          if (identity && priorStatus === "confirmed_removed") {
+            const probe = probes.find((item) => item.surfaceIdentity === identity && item.status === "present");
+            if (probe) lifecycleEvents.push({ kind: "restored", probe, observationId: existing.id });
+          }
         } else {
           const priorVersions = await tx.observation.findMany({
             where: {
@@ -95,7 +129,7 @@ async function persist(
             changedObservations.push(observation);
           }
 
-          await tx.observation.create({
+          const created = await tx.observation.create({
             data: {
               companyId: dbCompany.id,
               runId: run.id,
@@ -107,9 +141,47 @@ async function persist(
               fingerprint: observation.fingerprint,
               observedAt: new Date(observation.observedAt),
               metadata: observation.metadata,
+              status: "active",
+              missCount: 0,
+              lastProbeAt: new Date(),
             },
           });
+          const identity = observation.metadata && "surfaceIdentity" in observation.metadata
+            ? String(observation.metadata.surfaceIdentity || "")
+            : "";
+          const priorSurface = identity ? latestSurfaceByIdentity.get(identity) : undefined;
+          if (identity && priorSurface?.status === "confirmed_removed") {
+            const probe = probes.find((item) => item.surfaceIdentity === identity && item.status === "present");
+            if (probe) lifecycleEvents.push({ kind: "restored", probe, observationId: created.id });
+          }
           newObservationCount++;
+        }
+      }
+
+      for (const probe of probes.filter((item) => item.status === "missing")) {
+        const latest = latestSurfaceByIdentity.get(probe.surfaceIdentity);
+        if (!latest || latest.status === "confirmed_removed") continue;
+
+        const nextMissCount = latest.missCount + 1;
+        const confirmed = nextMissCount >= 2;
+        await tx.observation.update({
+          where: { id: latest.id },
+          data: {
+            status: confirmed ? "confirmed_removed" : "suspected_missing",
+            missCount: nextMissCount,
+            lastProbeAt: new Date(probe.checkedAt),
+            missingSince: latest.missingSince || new Date(probe.checkedAt),
+            confirmedRemovedAt: confirmed ? new Date(probe.checkedAt) : null,
+            runId: run.id,
+          },
+        });
+        if (confirmed) {
+          lifecycleEvents.push({
+            kind: "removed",
+            probe,
+            observationId: latest.id,
+            missCount: nextMissCount,
+          });
         }
       }
 
@@ -144,6 +216,24 @@ async function persist(
         });
       }
 
+      for (const event of lifecycleEvents) {
+        const removed = event.kind === "removed";
+        await tx.signal.create({
+          data: {
+            companyId: dbCompany.id,
+            runId: run.id,
+            score: removed ? 68 : 56,
+            headline: removed ? "Public product surface removed" : "Public product surface restored",
+            detail: removed
+              ? event.probe.label + " at " + event.probe.path + " returned " + event.probe.httpStatus + " on two consecutive monitoring runs. The surface was previously observed and is now treated as historically removed."
+              : event.probe.label + " at " + event.probe.path + " became reachable again after a confirmed removal state. Investigate whether the surface was restored, migrated, or replaced.",
+            commercialInterpretation: removed
+              ? "Historical product/API change; investigate whether the capability was retired, migrated or replaced"
+              : "Historical product/API restoration; investigate the current surface and any migration or relaunch",
+          },
+        });
+      }
+
       await tx.monitoringRun.update({
         where: { id: run.id },
         data: {
@@ -165,6 +255,13 @@ async function persist(
         baselineCategories,
         historicalIntersection,
         crossSignal,
+        lifecycleEvents: lifecycleEvents.map((event) => ({
+          kind: event.kind,
+          path: event.probe.path,
+          label: event.probe.label,
+          status: event.probe.httpStatus,
+          missCount: event.missCount || 0,
+        })),
       };
     });
     return result;
@@ -232,9 +329,9 @@ export async function GET(request: Request) {
       }
     : null;
 
-  const persistence = await persist(company, domain, unique, signal, collected.errors);
+  const persistence = await persist(company, domain, unique, signal, collected.errors, collected.probes || []);
   const changeDetected = persistence.status === "persisted"
-    ? persistence.newObservationCount > 0 || persistence.changedObservationCount > 0
+    ? persistence.newObservationCount > 0 || persistence.changedObservationCount > 0 || (persistence.lifecycleEvents?.length || 0) > 0
     : null;
 
   return NextResponse.json({
@@ -252,7 +349,9 @@ export async function GET(request: Request) {
       unchangedObservationCount: persistence.unchangedObservationCount,
       changedObservationCount: persistence.changedObservationCount,
       previousObservationCount: persistence.previousObservationCount,
+      lifecycleEventCount: persistence.lifecycleEvents?.length || 0,
     },
+    lifecycle: persistence.lifecycleEvents || [],
     signal,
     observations: unique.slice(0, 30),
     errors: collected.errors,
