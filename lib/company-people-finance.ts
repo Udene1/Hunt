@@ -119,6 +119,9 @@ export async function collectCompanyPeopleAndFinance(company: string, domain: st
         const phone = typeof node.telephone === "string" ? clean(node.telephone) : null;
         const sameAs = Array.isArray(node.sameAs) ? node.sameAs.map(String) : [];
         const linkedinUrl = sameAs.find((item) => /linkedin\.com\//i.test(item)) || null;
+        const pathLooksProfessional = /\/(about|about-us|team|leadership|management|company)(?:\/|$)/i.test(new URL(url).pathname) || url === root;
+        if (!role && !linkedinUrl && !email && !phone) continue;
+        if (!pathLooksProfessional && !role) continue;
         const key = name.toLowerCase() + "|" + (role || "").toLowerCase();
         contacts.set(key, {
           name, role, email, phone, linkedinUrl,
