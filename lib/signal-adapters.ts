@@ -1,4 +1,4 @@
-import { detectProductSurfaces } from "./product-surfaces";
+import { detectProductSurfaces, type SurfaceProbe } from "./product-surfaces";
 import { githubAdapter } from "./github-signals";
 
 export type Observation = {
@@ -15,6 +15,7 @@ export type Observation = {
 export type SignalAdapterResult = {
   observations: Observation[];
   errors: string[];
+  probes?: SurfaceProbe[];
 };
 
 export type SignalAdapter = {
@@ -367,5 +368,6 @@ export async function collectObservations(company: string, domain: string | null
     adapters: SIGNAL_ADAPTERS.map((adapter) => adapter.id),
     observations: results.flatMap((result) => result.observations),
     errors: results.flatMap((result) => result.errors),
+    probes: results.flatMap((result) => result.probes || []),
   };
 }
