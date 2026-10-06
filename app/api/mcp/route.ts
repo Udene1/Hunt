@@ -65,9 +65,9 @@ const handler = createMcpHandler(({ requestInfo }) => {
 
       const payload = {
         company: { name: record.name, domain: record.domain, country: record.country },
-        observations: record.observations,
-        signals: record.signals,
-        runs: record.runs,
+        observations: record.observations.map((o) => ({ ...o, observedAt: o.observedAt.toISOString(), firstSeenAt: o.firstSeenAt.toISOString(), lastSeenAt: o.lastSeenAt.toISOString(), lastProbeAt: o.lastProbeAt?.toISOString() || null, missingSince: o.missingSince?.toISOString() || null, confirmedRemovedAt: o.confirmedRemovedAt?.toISOString() || null })),
+        signals: record.signals.map((s) => ({ ...s, createdAt: s.createdAt.toISOString() })),
+        runs: record.runs.map((r) => ({ ...r, startedAt: r.startedAt.toISOString(), finishedAt: r.finishedAt?.toISOString() || null })),
         evidenceRule: "Observations are public evidence collected by Hunt; signals are Hunt's deterministic change/cluster outputs, not AI conclusions.",
       };
       return {
@@ -98,7 +98,7 @@ const handler = createMcpHandler(({ requestInfo }) => {
       const relevance = scoreCompanyRelevance(user.profile || {}, record, record.observations);
       const payload = {
         company: { name: record.name, domain: record.domain, country: record.country },
-        relevance,
+        relevance: { ...relevance, evidence: relevance.evidence.map((e) => ({ ...e, observedAt: e.observedAt.toISOString() })) },
         basis: "deterministic evidence-to-objective matching; no model inference",
       };
       return {
