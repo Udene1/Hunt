@@ -44,11 +44,58 @@ const match = (j: Job, company: string) =>
     .includes(company.toLowerCase());
 
 const classifyJob = (j: Job) => {
-  const t = [j.title, j.description, ...(j.tags || [])].filter(Boolean).join(" ").toLowerCase();
-  if (/security|cyber|soc|iam|compliance|risk/.test(t)) return "Security / compliance";
-  if (/backend|platform|infrastructure|devops|site reliability|cloud|api|software engineer/.test(t)) return "Engineering / infrastructure";
-  if (/sales|business development|partnership|account executive/.test(t)) return "Commercial";
-  if (/product|operations|implementation/.test(t)) return "Product / operations";
+  const title = (j.title || "").toLowerCase().trim();
+  const text = [j.title, j.description, ...(j.tags || [])]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  // Titles are the strongest role signal. Avoid broad description keywords
+  // such as "risk" or "security" hijacking unrelated research/engineering roles.
+  if (/quantum|quantum information|quantum computing|quantum scientist|quantum engineer/.test(title)) {
+    return "Research / quantum";
+  }
+  if (/security engineer|cybersecurity|security analyst|soc analyst|information security|iam|identity|compliance officer|compliance manager|risk manager/.test(title)) {
+    return "Security / compliance";
+  }
+  if (/backend|platform|infrastructure|devops|site reliability|cloud|api|software engineer/.test(title)) {
+    return "Engineering / infrastructure";
+  }
+  if (/sales|business development|partnership|account executive/.test(title)) {
+    return "Commercial";
+  }
+  if (/product|operations|implementation/.test(title)) {
+    return "Product / operations";
+  }
+  if (/data scientist|data analyst|analytics|machine learning|ml engineer|ai engineer/.test(title)) {
+    return "Data / AI";
+  }
+  if (/research scientist|research engineer|research/.test(title)) {
+    return "Research";
+  }
+
+  // Only use description corroboration when the title itself is generic.
+  if (/security|cybersecurity|soc|iam|identity|compliance/.test(text)) {
+    return "Security / compliance";
+  }
+  if (/backend|platform|infrastructure|devops|site reliability|cloud|api|software engineer/.test(text)) {
+    return "Engineering / infrastructure";
+  }
+  if (/sales|business development|partnership|account executive/.test(text)) {
+    return "Commercial";
+  }
+  if (/product|operations|implementation/.test(text)) {
+    return "Product / operations";
+  }
+  if (/quantum/.test(text)) {
+    return "Research / quantum";
+  }
+  if (/data scientist|data analyst|analytics|machine learning|ml engineer|ai engineer/.test(text)) {
+    return "Data / AI";
+  }
+  if (/research scientist|research engineer|research/.test(text)) {
+    return "Research";
+  }
   return "Hiring";
 };
 
@@ -200,7 +247,6 @@ const procurementAdapter: SignalAdapter = {
   },
 };
 
-
 const technologyAdapter: SignalAdapter = {
   id: "technology",
   async collect(company, domain) {
@@ -295,7 +341,6 @@ const technologyAdapter: SignalAdapter = {
   },
 };
 
-// New signal families should be added here, without changing the monitoring engine.
 export const SIGNAL_ADAPTERS: SignalAdapter[] = [jobAdapter, websiteAdapter, procurementAdapter, technologyAdapter];
 
 export async function collectObservations(company: string, domain: string | null) {
