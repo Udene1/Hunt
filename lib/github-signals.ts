@@ -389,7 +389,8 @@ const githubAdapter = {
         });
       }
       if (events.error) errors.push(repo.full_name + ": " + events.error);
-      if (releases.error) errors.push(repo.full_name + ": " + releases.error);\n      if (content.error) errors.push(repo.full_name + ": " + content.error);
+      if (releases.error) errors.push(repo.full_name + ": " + releases.error);
+      if (content.error) errors.push(repo.full_name + ": " + content.error);
     }
 
     return {
