@@ -229,7 +229,7 @@ async function collectReleases(repo: GitHubRepo) {
 
 const githubAdapter = {
   id: "github",
-  async collect(company: string): Promise<SignalAdapterResult> {
+  async collect(company: string, domain: string | null): Promise<SignalAdapterResult> {
     const errors: string[] = [];
     const observations: Observation[] = [];
 
