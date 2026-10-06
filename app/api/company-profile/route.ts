@@ -11,8 +11,8 @@ export async function GET(request: Request) {
     where: { name: { equals: company, mode: "insensitive" } },
     select: {
       name: true, domain: true, country: true, generalSummary: true,
-      contacts: { orderBy: { lastSeenAt: "desc" }, take: 30 },
-      financialRecords: { orderBy: [{ publishedAt: "desc" }, { observedAt: "desc" }], take: 10 },
+      contacts: { where: { verificationStatus: "verified" }, orderBy: { lastSeenAt: "desc" }, take: 30 },
+      financialRecords: { where: { verificationStatus: "verified" }, orderBy: [{ publishedAt: "desc" }, { observedAt: "desc" }], take: 10 },
     },
   });
   if (!record) return NextResponse.json({ error: "Company not found." }, { status: 404 });
