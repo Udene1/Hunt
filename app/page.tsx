@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type Company = {
   name: string;
@@ -42,7 +42,7 @@ export default function Home() {
   const [profiles, setProfiles] = useState<Record<string, CompanyProfile>>({});
   const [loading, setLoading] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState<string | null>(null);
-  const [watchPersistent, setWatchPersistent] = useState(false);
+  const [watchPersistent, setWatchPersistent] = useState(false);\n  const autoScanTargets = useRef(new Set<string>());
 
   useEffect(() => {
     fetch("/api/companies").then((r) => r.json()).then((d) => setCompanies(d.companies || [])).catch(() => {});
@@ -82,7 +82,7 @@ export default function Home() {
 
   async function loadProfile(company: string) {
     try {
-      const r = await fetch("/api/company-profile?company=" + encodeURIComponent(target), { cache: "no-store" });
+      const r = await fetch("/api/company-profile?company=" + encodeURIComponent(company), { cache: "no-store" });
       const data = await r.json();
       if (r.ok) setProfiles((p) => ({ ...p, [company]: data }));
     } catch {}
@@ -111,6 +111,11 @@ export default function Home() {
         return;
       }
       setMonitor((m) => ({ ...m, [target]: data }));
+      if (r.ok && data.persistence?.status === "persisted") {
+        const catalogueResponse = await fetch("/api/companies?q=" + encodeURIComponent(target), { cache: "no-store" });
+        const catalogueData = await catalogueResponse.json().catch(() => ({}));
+        setCompanies(catalogueData.companies || []);
+      }
       await loadHistory(target);
     } finally { setLoading(null); }
   }
