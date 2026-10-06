@@ -387,5 +387,6 @@ export async function collectObservations(company: string, domain: string | null
     probes: results.flatMap((result) => result.probes || []),
     contacts: results.flatMap((result) => result.contacts || []),
     financials: results.flatMap((result) => result.financials || []),
+    reviewIssues: results.flatMap((result) => result.reviewIssues || []),
   };
 }
