@@ -58,14 +58,6 @@ function personNodes(value: unknown): Record<string, unknown>[] {
   });
 }
 
-function findEmail(text: string) {
-  return text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || null;
-}
-
-function findPhone(text: string) {
-  return text.match(/(?:\+234|0)[0-9][\d\s().-]{7,}/)?.[0]?.replace(/\s+/g, " ") || null;
-}
-
 function extractFinancialMetrics(text: string) {
   const patterns: Array<[string, RegExp]> = [
     ["revenue", /(?:revenue|turnover)\s*(?:was|of|:)?\s*(?:₦|NGN|N|USD|US\$|£|EUR|€)?\s*([0-9][0-9,]*(?:\.[0-9]+)?(?:\s*(?:million|billion|m|bn))?)/i],
