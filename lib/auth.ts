@@ -65,7 +65,6 @@ export async function destroyCurrentSession() {
 
 export { hashPassword, verifyPassword };
 
-
 export async function getBearerUser(request: Request) {
   const header = request.headers.get("authorization") || "";
   if (!header.startsWith("Bearer ")) return null;
@@ -79,4 +78,20 @@ export async function getBearerUser(request: Request) {
   if (access.user.plan === "pilot" && (!access.user.pilotExpiresAt || access.user.pilotExpiresAt <= new Date())) return null;
   await prisma.accessToken.update({ where: { id: access.id }, data: { lastUsedAt: new Date() } }).catch(() => {});
   return access.user;
+}
+
+export async function getAdminBearer(request: Request) {
+  const header = request.headers.get("authorization") || "";
+  if (!header.startsWith("Bearer ")) return null;
+  const token = header.slice(7).trim();
+  if (!token) return null;
+  const access = await prisma.adminAccessToken.findUnique({
+    where: { tokenHash: hashToken(token) },
+  });
+  if (!access || access.revokedAt) return null;
+  await prisma.adminAccessToken.update({
+    where: { id: access.id },
+    data: { lastUsedAt: new Date() },
+  }).catch(() => {});
+  return access;
 }
