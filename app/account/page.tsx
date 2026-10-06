@@ -25,6 +25,8 @@ export default function AccountPage() {
   const [saving, setSaving] = useState(false);
   const [pilotPin, setPilotPin] = useState("");
   const [redeeming, setRedeeming] = useState(false);
+  const [mcpToken, setMcpToken] = useState("");
+  const [tokenBusy, setTokenBusy] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/me", { cache: "no-store" }).then(async (r) => {
@@ -93,6 +95,17 @@ export default function AccountPage() {
     setStatus("Pilot activated. Monitoring and watchlists are now enabled until " + new Date(data.user.pilotExpiresAt).toLocaleDateString() + ".");
   }
 
+  async function createMcpToken() {
+    setTokenBusy(true);
+    setStatus("");
+    const r = await fetch("/api/auth/mcp-token", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ label: "MCP" }) });
+    const data = await r.json().catch(() => ({}));
+    setTokenBusy(false);
+    if (!r.ok) return setStatus(data.error || "Could not create MCP token.");
+    setMcpToken(data.token);
+    setStatus("MCP token created. Copy it now; Hunt will not display the secret again.");
+  }
+
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
@@ -133,6 +146,13 @@ export default function AccountPage() {
               <button className="watch" type="submit">{redeeming ? "Activating…" : "Activate pilot →"}</button>
             </form>
           )}
+          <div className="card">
+            <p className="eyebrow">AI CONNECTION</p>
+            <h2>Hunt MCP</h2>
+            <p>Connect Hunt to GPT, Claude or another MCP host with a bearer token. The token is separate from your browser session and can be revoked later.</p>
+            <button className="watch" type="button" onClick={createMcpToken} disabled={tokenBusy}>{tokenBusy ? "Creating…" : "Create MCP token →"}</button>
+            {mcpToken && <input readOnly value={mcpToken} onFocus={(e) => e.currentTarget.select()} style={{ width: "100%", padding: 12, border: "1px solid #d5d2c9", borderRadius: 8, marginTop: 12, fontFamily: "monospace" }} />}
+          </div>
           <form className="card" onSubmit={saveProfile}>
             <label>Profession / what you sell<input name="profession" defaultValue={profile.profession || ""} placeholder="Backend / infrastructure engineer" /></label>
             <label>Services<input name="services" defaultValue={listValue(profile.services)} placeholder="backend engineering, cloud reliability, security" /></label>
