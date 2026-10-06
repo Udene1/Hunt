@@ -292,6 +292,7 @@ model CompanyContact {
   sourceUrl   String?
   evidenceId  String?
   confidence  Int      @default(50)
+  verificationStatus String @default("verified")
   firstSeenAt DateTime @default(now())
   lastSeenAt  DateTime @default(now())
   company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -315,6 +316,7 @@ model FinancialRecord {
   metrics        Json?
   evidenceId     String?
   confidence     Int      @default(50)
+  verificationStatus String @default("verified")
   company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   @@unique([companyId, period, statementType, source])
   @@index([companyId, publishedAt])
