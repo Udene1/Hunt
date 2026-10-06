@@ -163,6 +163,46 @@ async function collectRepoEvents(repo: GitHubRepo) {
   return { observations, error: null as string | null };
 }
 
+async function discoverGitHubOwners(domain: string | null): Promise<string[]> {
+  if (!domain) return [];
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3500);
+  try {
+    const response = await fetch("https://" + domain.replace(/^https?:\\/\\//, "").replace(/\\/$/, ""), {
+      signal: controller.signal,
+      cache: "no-store",
+      redirect: "follow",
+      headers: { "user-agent": "Opportunity-Intelligence/0.3 evidence-monitor", accept: "text/html,*/*" },
+    });
+    if (!response.ok) return [];
+    const body = (await response.text()).slice(0, 180000);
+    const owners = new Set<string>();
+    const re = /https?:\\/\\/github\\.com\\/([A-Za-z0-9_.-]+)(?:[\\/"?#]|$)/gi;
+    for (const match of body.matchAll(re)) {
+      const owner = match[1].trim();
+      if (owner && !["features","marketplace","pricing","login","signup","about"].includes(owner.toLowerCase())) owners.add(owner);
+    }
+    return Array.from(owners).slice(0, 3);
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function collectOwnerRepositories(owner: string) {
+  const result = await githubFetch<GitHubRepo[]>(
+    "/orgs/" + encodeURIComponent(owner) + "/repos?sort=updated&direction=desc&per_page=5",
+  );
+  if (result.data) return { repos: result.data, error: null as string | null };
+  const user = await githubFetch<GitHubRepo[]>(
+    "/users/" + encodeURIComponent(owner) + "/repos?sort=updated&direction=desc&per_page=5",
+  );
+  return user.data
+    ? { repos: user.data, error: null as string | null }
+    : { repos: [] as GitHubRepo[], error: "GitHub owner repositories unavailable" };
+}
+
 async function collectReleases(repo: GitHubRepo) {
   const result = await githubFetch<GitHubRelease[]>(
     "/repos/" + encodeURIComponent(repo.owner?.login || "") + "/" + encodeURIComponent(repo.name) + "/releases?per_page=3",
@@ -192,18 +232,33 @@ const githubAdapter = {
     const errors: string[] = [];
     const observations: Observation[] = [];
 
-    const search = await githubFetch<{ items?: GitHubRepo[] }>(
-      "/search/repositories?q=" + encodeURIComponent(company) + "&sort=updated&order=desc&per_page=10",
-    );
+    const owners = await discoverGitHubOwners(domain);
+    let repos: GitHubRepo[] = [];
 
-    if (!search.data?.items) {
-      if (search.status === 403) errors.push("GitHub rate limit reached");
-      else errors.push("GitHub repository search unavailable");
-      return { observations, errors };
+    // Prefer an explicit GitHub link published by the company's own website.
+    // This is stronger entity evidence than repository-name search.
+    for (const owner of owners) {
+      const result = await collectOwnerRepositories(owner);
+      if (result.error) errors.push(owner + ": " + result.error);
+      repos.push(...result.repos);
     }
 
-    const repos = search.data.items
-      .filter((repo) => !repo.archived && !repo.fork && likelyOwnedRepository(repo, company))
+    // Fall back to GitHub search only when the official site exposes no GitHub
+    // identity. Search is more restrictive, so keep the fallback bounded.
+    if (!repos.length) {
+      const search = await githubFetch<{ items?: GitHubRepo[] }>(
+        "/search/repositories?q=" + encodeURIComponent(company) + "&sort=updated&order=desc&per_page=10",
+      );
+      if (!search.data?.items) {
+        if (search.status === 403) errors.push("GitHub rate limit reached");
+        else errors.push("GitHub repository search unavailable");
+        return { observations, errors };
+      }
+      repos = search.data.items.filter((repo) => likelyOwnedRepository(repo, company));
+    }
+
+    repos = repos
+      .filter((repo) => !repo.archived && !repo.fork)
       .slice(0, 3);
 
     for (const repo of repos) observations.push(await observeRepo(repo));
