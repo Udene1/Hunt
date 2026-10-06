@@ -78,6 +78,48 @@ const handler = createMcpHandler(({ requestInfo }) => {
   );
 
   server.registerTool(
+    "get_opportunity_candidates",
+    {
+      title: "Get Hunt opportunity candidates",
+      description: "Return deterministic opportunity candidates created for the authenticated user's watched companies and commercial profile.",
+      inputSchema: z.object({ limit: z.number().int().min(1).max(50).optional() }),
+    },
+    async ({ limit }) => {
+      const user = requestInfo ? await getBearerUser(requestInfo) : null;
+      if (!user || !monitoringEntitled(user)) return { content: [{ type: "text", text: "Authentication or active pilot/paid access is required." }], isError: true };
+      const candidates = await prisma.opportunityCandidate.findMany({
+        where: { userId: user.id },
+        orderBy: { updatedAt: "desc" },
+        take: limit || 20,
+        include: { company: true, cluster: true },
+      });
+      const payload = { opportunities: candidates.map((o) => ({ id:o.id, score:o.score, status:o.status, investigationState:o.investigationState, reason:o.reason, evidenceIds:o.evidenceIds, company:{name:o.company.name,domain:o.company.domain}, cluster:{id:o.cluster.id,headline:o.cluster.headline,categories:o.cluster.categories} })) };
+      return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }], structuredContent: payload };
+    },
+  );
+
+  server.registerTool(
+    "get_notifications",
+    {
+      title: "Get Hunt notifications",
+      description: "Return recent durable Hunt notifications for the authenticated user.",
+      inputSchema: z.object({ unreadOnly: z.boolean().optional() }),
+    },
+    async ({ unreadOnly }) => {
+      const user = requestInfo ? await getBearerUser(requestInfo) : null;
+      if (!user || !monitoringEntitled(user)) return { content: [{ type: "text", text: "Authentication or active pilot/paid access is required." }], isError: true };
+      const notifications = await prisma.notification.findMany({
+        where: { userId: user.id, ...(unreadOnly ? { readAt: null } : {}) },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+        include: { company: true, opportunity: true },
+      });
+      const payload = { unread: notifications.filter((n) => !n.readAt).length, notifications: notifications.map((n) => ({ id:n.id,type:n.type,title:n.title,body:n.body,readAt:n.readAt?.toISOString() || null,createdAt:n.createdAt.toISOString(),company:n.company.name,opportunityId:n.opportunityId })) };
+      return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }], structuredContent: payload };
+    },
+  );
+
+  server.registerTool(
     "get_company_changes",
     {
       title: "Get Hunt company changes",
