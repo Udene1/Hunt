@@ -1,4 +1,5 @@
 import type { Observation } from "./signal-adapters";
+import { extractFinancialDocument, type FinancialDocumentIssue } from "./financial-document-extractor";
 
 export type DiscoveredContact = {
   name: string;
@@ -10,7 +11,7 @@ export type DiscoveredContact = {
   sourceUrl: string | null;
   evidenceFingerprint: string | null;
   confidence: number;
-  verificationStatus: "verified" | "admin_supplied" | "unverified";
+  verificationStatus: "verified" | "admin_supplied" | "unverified" | "needs_review";
 };
 
 export type DiscoveredFinancialRecord = {
@@ -24,7 +25,7 @@ export type DiscoveredFinancialRecord = {
   metrics: Record<string, string | number | boolean> | null;
   evidenceFingerprint: string;
   confidence: number;
-  verificationStatus: "verified" | "admin_supplied" | "unverified";
+  verificationStatus: "verified" | "admin_supplied" | "unverified" | "needs_review";
 };
 
 async function sha256(value: string) {
@@ -85,6 +86,7 @@ export async function collectCompanyPeopleAndFinance(company: string, domain: st
   const financials = new Map<string, DiscoveredFinancialRecord>();
   const observations: Observation[] = [];
   const errors: string[] = [];
+  const reviewIssues: Array<FinancialDocumentIssue> = [];
   if (!domain) return { contacts: [], financials: [], observations, errors };
 
   const root = "https://" + domain;
@@ -135,12 +137,37 @@ export async function collectCompanyPeopleAndFinance(company: string, domain: st
         const period = (label + " " + href).match(/20\d{2}(?:[-/]20\d{2})?/)?.[0] || "latest";
         const statementType = /quarter|q[1-4]/i.test(label + href) ? "quarterly" : /results/i.test(label) ? "results" : "annual";
         const fingerprint = await sha256("financial|" + href);
+        let document: Awaited<ReturnType<typeof extractFinancialDocument>> | null = null;
+        if (/\.pdf(?:$|[?#])/i.test(href)) {
+          try {
+            document = await extractFinancialDocument(href);
+            reviewIssues.push(...document.issues);
+          } catch (error) {
+            const detail = error instanceof Error ? error.message : "Unknown financial extraction error.";
+            const issue = {
+              type: "pdf_extraction_failed" as const,
+              severity: "high" as const,
+              title: "Financial PDF extraction failed",
+              detail,
+              sourceUrl: href,
+              fingerprint: "financial-pdf-failure|" + href,
+            };
+            reviewIssues.push(issue);
+          }
+        }
+        const resolvedPeriod = document?.period || period;
+        const resolvedCurrency = document?.currency || (/ngn|naira|₦/i.test(label + href) ? "NGN" : null);
+        const metrics = document?.extracted
+          ? { ...document.metrics, metricEvidence: document.metricEvidence }
+          : extractFinancialMetrics(text);
         financials.set(href, {
-          period, statementType, currency: /ngn|naira|₦/i.test(label + href) ? "NGN" : null,
+          period: resolvedPeriod,
+          statementType: document?.statementType || statementType,
+          currency: resolvedCurrency,
           source: "Official website", sourceUrl: href, publishedAt: null,
           summary: label || "Financial report",
-          metrics: extractFinancialMetrics(text), evidenceFingerprint: fingerprint, confidence: 88,
-          verificationStatus: "verified",
+          metrics, evidenceFingerprint: fingerprint, confidence: 88,
+          verificationStatus: document?.issues.some((issue) => issue.type === "pdf_extraction_failed" || issue.type === "pdf_scanned") ? "needs_review" : "verified",
         });
         observations.push({
           source: "Official website",
@@ -160,5 +187,5 @@ export async function collectCompanyPeopleAndFinance(company: string, domain: st
     }
   }
 
-  return { contacts: Array.from(contacts.values()), financials: Array.from(financials.values()), observations, errors };
+  return { contacts: Array.from(contacts.values()), financials: Array.from(financials.values()), observations, errors, reviewIssues };
 }
