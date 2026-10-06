@@ -132,3 +132,16 @@ model Session {
   @@index([expiresAt])
   @@schema("hunt")
 }
+
+
+model UserWatch {
+  id        String   @id @default(cuid())
+  userId    String
+  companyId String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  @@unique([userId, companyId])
+  @@index([userId, createdAt])
+  @@schema("hunt")
+}
