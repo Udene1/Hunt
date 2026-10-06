@@ -16,10 +16,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "DATABASE_URL is not configured" }, { status: 503 });
   }
 
-  const watches = await prisma.watch.findMany({
-    include: { company: true },
-    orderBy: { createdAt: "asc" },
-  });
+  const [legacyWatches, userWatches] = await Promise.all([
+    prisma.watch.findMany({ include: { company: true }, orderBy: { createdAt: "asc" } }),
+    prisma.userWatch.findMany({ include: { company: true }, orderBy: { createdAt: "asc" } }),
+  ]);
+  const companyMap = new Map<string, typeof legacyWatches[number]["company"]>();
+  for (const watch of legacyWatches) companyMap.set(watch.company.id, watch.company);
+  for (const watch of userWatches) companyMap.set(watch.company.id, watch.company);
+  const watches = Array.from(companyMap.values());
 
   if (!watches.length) {
     return NextResponse.json({ ok: true, selected: 0, processed: 0, results: [] });
