@@ -186,7 +186,7 @@ const handler = createMcpHandler(({ requestInfo }) => {
           sourceUrl: z.string().url().max(1000).optional(),
           publishedAt: z.string().optional(),
           summary: z.string().max(2000).optional(),
-          metrics: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+          metrics: z.record(z.string(), z.unknown()).optional(),
           evidenceId: z.string().max(100).optional(),
           confidence: z.number().int().min(0).max(100).optional(),
           verificationStatus: z.enum(["admin_supplied", "verified", "unverified"]).optional(),
