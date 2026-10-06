@@ -37,6 +37,7 @@ export async function GET(request: Request) {
     try {
       const response = await fetch(`${origin}/api/monitor?company=${encodeURIComponent(watch.company.name)}`, {
         cache: "no-store",
+        headers: { authorization: `Bearer ${secret}` },
       });
       const data = await response.json().catch(() => ({}));
       results.push({
