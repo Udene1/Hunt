@@ -13,5 +13,5 @@ export async function GET(request: Request) {
     select: { name: true, domain: true, contacts: { where: { verificationStatus: "verified" }, orderBy: { lastSeenAt: "desc" }, take: 100 } },
   });
   if (!record) return NextResponse.json({ error: "Company not found in Hunt history." }, { status: 404 });
-  return NextResponse.json(record);
+  return NextResponse.json({ ...record, verification: record.contacts.length ? "verified_records_available" : "no_verified_contacts_found" });
 }
