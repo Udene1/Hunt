@@ -19,7 +19,7 @@ function verifyPassword(password: string, stored: string) {
   return expectedBuffer.length === actual.length && timingSafeEqual(actual, expectedBuffer);
 }
 
-function hashToken(token: string) {
+export function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
