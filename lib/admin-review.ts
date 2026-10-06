@@ -14,6 +14,8 @@ export type ReviewIssue = {
 export async function createAdminReviewTasks(issues: ReviewIssue[]) {
   const created = [];
   for (const issue of issues) {
+    const existing = await prisma.adminReviewTask.findUnique({ where: { fingerprint: issue.fingerprint } });
+    if (existing?.status === "open") continue;
     const task = await prisma.adminReviewTask.upsert({
       where: { fingerprint: issue.fingerprint },
       update: {
