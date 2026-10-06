@@ -419,7 +419,6 @@ async function persist(
         })),
       };
     });
-    return result;
     const companyRecord = await prisma.company.findUnique({ where: { normalized }, select: { id: true } });
     if (companyRecord && reviewIssues.length) {
       const tasks = await createAdminReviewTasks(reviewIssues.map((issue) => ({ ...issue, companyId: companyRecord.id })));
@@ -427,6 +426,7 @@ async function persist(
         await pushAdminReviewAlert(task).catch(() => {});
       }
     }
+    return result;
   } catch (error) {
     console.error(
       "Hunt persistence error",
