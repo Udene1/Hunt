@@ -10,6 +10,7 @@ export type DiscoveredContact = {
   sourceUrl: string | null;
   evidenceFingerprint: string | null;
   confidence: number;
+  verificationStatus: "verified" | "admin_supplied" | "unverified";
 };
 
 export type DiscoveredFinancialRecord = {
@@ -23,6 +24,7 @@ export type DiscoveredFinancialRecord = {
   metrics: Record<string, string | number | boolean> | null;
   evidenceFingerprint: string;
   confidence: number;
+  verificationStatus: "verified" | "admin_supplied" | "unverified";
 };
 
 async function sha256(value: string) {
@@ -61,7 +63,27 @@ function findEmail(text: string) {
 }
 
 function findPhone(text: string) {
-  return text.match(/(?:\+234|0)[0-9][\d\s().-]{7,}/)?.[0]?.replace(/\s+/g, " ") || null;
+  return text.match(/(?:\\+234|0)[0-9][\\d\\s().-]{7,}/)?.[0]?.replace(/\\s+/g, " ") || null;
+}
+
+function extractFinancialMetrics(text: string) {
+  const patterns: Array<[string, RegExp]> = [
+    ["revenue", /(?:revenue|turnover)\\s*(?:was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn))?)/i],
+    ["netProfit", /(?:profit after tax|net profit|profit for the year)\\s*(?:was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn))?)/i],
+    ["grossProfit", /gross profit\\s*(?:was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn))?)/i],
+    ["assets", /total assets\\s*(?:were|was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn))?)/i],
+    ["liabilities", /total liabilities\\s*(?:were|was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn))?)/i],
+    ["cash", /(?:cash and cash equivalents|cash equivalents)\\s*(?:were|was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn))?)/i],
+    ["debt", /(?:total debt|borrowings|loans and borrowings)\\s*(?:were|was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn))?)/i],
+    ["equity", /(?:total equity|shareholders' equity|shareholders equity)\\s*(?:was|were|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn))?)/i],
+    ["capex", /(?:capital expenditure|capex)\\s*(?:was|of|:)?\\s*(?:₦|NGN|N|USD|US\\$|£|EUR|€)?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?(?:\\s*(?:million|billion|m|bn))?)/i],
+  ];
+  const metrics: Record<string, string> = {};
+  for (const [key, pattern] of patterns) {
+    const value = text.replace(/\\s+/g, " ").match(pattern)?.[1];
+    if (value) metrics[key] = value.trim();
+  }
+  return Object.keys(metrics).length ? metrics : null;
 }
 
 const contactPaths = ["/about", "/about-us", "/team", "/leadership", "/management", "/company", "/contact"];
@@ -104,21 +126,13 @@ export async function collectCompanyPeopleAndFinance(company: string, domain: st
           sourceUrl: url,
           evidenceFingerprint: null,
           confidence: 82,
+          verificationStatus: "verified",
         });
       }
 
-      const text = clean(html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " "));
+      const text = clean(html.replace(/<script[\\s\\S]*?<\\/script>/gi, " ").replace(/<style[\\s\\S]*?<\\/style>/gi, " ").replace(/<[^>]+>/g, " "));
       const email = findEmail(text);
       const phone = findPhone(text);
-      if (email || phone) {
-        const name = email?.split("@")[0]?.replace(/[._-]+/g, " ") || company + " contact";
-        const key = name.toLowerCase() + "|contact";
-        if (!contacts.has(key)) contacts.set(key, {
-          name: clean(name), role: "Public contact", email, phone, linkedinUrl: null,
-          source: "Official website", sourceUrl: url, evidenceFingerprint: null, confidence: 55,
-        });
-      }
-
       const anchors = Array.from(html.matchAll(/<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi));
       for (const match of anchors) {
         const label = clean(match[2].replace(/<[^>]+>/g, " "));
@@ -132,7 +146,8 @@ export async function collectCompanyPeopleAndFinance(company: string, domain: st
           period, statementType, currency: /ngn|naira|₦/i.test(label + href) ? "NGN" : null,
           source: "Official website", sourceUrl: href, publishedAt: null,
           summary: label || "Financial report",
-          metrics: null, evidenceFingerprint: fingerprint, confidence: 88,
+          metrics: extractFinancialMetrics(text), evidenceFingerprint: fingerprint, confidence: 88,
+          verificationStatus: "verified",
         });
         observations.push({
           source: "Official website",
