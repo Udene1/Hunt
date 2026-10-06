@@ -47,6 +47,9 @@ export default function Home() {
       if (d.persistent) {
         setWatchPersistent(true);
         setWatch((d.companies || []).map((c: Company) => c.name));
+      } else if (d.code === "authentication_required" || d.code === "plan_required") {
+        setWatch([]);
+        localStorage.removeItem("hunt-watchlist");
       }
     }).catch(() => {});
   }, []);
@@ -76,6 +79,10 @@ export default function Home() {
     try {
       const r = await fetch("/api/monitor?company=" + encodeURIComponent(company), { cache: "no-store" });
       const data = await r.json();
+      if (r.status === 401 || r.status === 402) {
+        window.location.href = "/account";
+        return;
+      }
       setMonitor((m) => ({ ...m, [company]: data }));
       await loadHistory(company);
     } finally { setLoading(null); }
@@ -94,6 +101,11 @@ export default function Home() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ company }),
     }).catch(() => null);
+    if (r?.status === 401 || r?.status === 402) {
+      setWatch((x) => x.filter((a) => a !== company));
+      window.location.href = "/account";
+      return;
+    }
     if (r?.ok) {
       const data = await r.json().catch(() => ({}));
       if (data.persistent) setWatchPersistent(true);
@@ -110,7 +122,7 @@ export default function Home() {
     <main>
       <header>
         <div className="brand">OPPORTUNITY<span>INTELLIGENCE</span></div>
-        <div className="status"><i /> evidence monitoring</div>
+        <div style={{display:"flex",gap:18,alignItems:"center"}}><a href="/account" style={{fontSize:12,color:"#171714",textDecoration:"none"}}>Account →</a><div className="status"><i /> evidence monitoring</div></div>
       </header>
 
       <section className="hero">
