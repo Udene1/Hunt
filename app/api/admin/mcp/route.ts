@@ -130,6 +130,95 @@ const handler = createMcpHandler(({ requestInfo }) => {
     },
   );
 
+  server.registerTool(
+    "get_company_profile",
+    {
+      title: "Get company profile context",
+      description: "Read existing durable contacts and source-backed financial records for a company.",
+      inputSchema: z.object({ company: z.string().min(1).max(160) }),
+    },
+    async ({ company }) => {
+      const admin = requestInfo ? await getAdminBearer(requestInfo) : null;
+      if (!admin) return { content: [{ type: "text", text: "Admin authentication required." }], isError: true };
+      const record = await prisma.company.findFirst({
+        where: { name: { equals: company, mode: "insensitive" } },
+        select: {
+          name: true,
+          contacts: { orderBy: { lastSeenAt: "desc" }, take: 100 },
+          financialRecords: { orderBy: [{ publishedAt: "desc" }, { observedAt: "desc" }], take: 30 },
+        },
+      });
+      if (!record) return { content: [{ type: "text", text: "Company not found in Hunt history." }], isError: true };
+      const payload = {
+        company: record.name,
+        contacts: record.contacts,
+        financials: record.financialRecords.map((f) => ({ ...f, publishedAt: f.publishedAt?.toISOString() || null, observedAt: f.observedAt.toISOString() })),
+        rule: "Only store source-backed professional contact and financial information. Preserve provenance and do not infer missing financial data.",
+      };
+      return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }], structuredContent: payload };
+    },
+  );
+
+  server.registerTool(
+    "update_company_profile",
+    {
+      title: "Update company contacts and financials",
+      description: "Upsert source-backed professional contacts and financial records. Call get_company_evidence or get_company_profile first.",
+      inputSchema: z.object({
+        company: z.string().min(1).max(160),
+        contacts: z.array(z.object({
+          name: z.string().min(1).max(180),
+          role: z.string().max(180).optional(),
+          email: z.string().max(320).optional(),
+          phone: z.string().max(80).optional(),
+          linkedinUrl: z.string().url().max(500).optional(),
+          source: z.string().min(1).max(160),
+          sourceUrl: z.string().url().max(1000).optional(),
+          evidenceId: z.string().max(100).optional(),
+          confidence: z.number().int().min(0).max(100).optional(),
+        })).max(100).optional(),
+        financials: z.array(z.object({
+          period: z.string().min(1).max(80),
+          statementType: z.string().min(1).max(120),
+          currency: z.string().max(20).optional(),
+          source: z.string().min(1).max(160),
+          sourceUrl: z.string().url().max(1000).optional(),
+          publishedAt: z.string().optional(),
+          summary: z.string().max(2000).optional(),
+          metrics: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+          evidenceId: z.string().max(100).optional(),
+          confidence: z.number().int().min(0).max(100).optional(),
+        })).max(30).optional(),
+      }),
+    },
+    async ({ company, contacts, financials }) => {
+      const admin = requestInfo ? await getAdminBearer(requestInfo) : null;
+      if (!admin) return { content: [{ type: "text", text: "Admin authentication required." }], isError: true };
+      const record = await prisma.company.findFirst({ where: { name: { equals: company, mode: "insensitive" } }, select: { id: true, name: true } });
+      if (!record) return { content: [{ type: "text", text: "Company not found in Hunt history." }], isError: true };
+      for (const item of contacts || []) {
+        await prisma.companyContact.upsert({
+          where: { companyId_name_role: { companyId: record.id, name: item.name.trim(), role: item.role?.trim() || "" } },
+          create: { companyId: record.id, name: item.name.trim(), role: item.role?.trim() || "", email: item.email?.trim() || null, phone: item.phone?.trim() || null, linkedinUrl: item.linkedinUrl?.trim() || null, source: item.source.trim(), sourceUrl: item.sourceUrl?.trim() || null, evidenceId: item.evidenceId || null, confidence: item.confidence ?? 50 },
+          update: { email: item.email?.trim(), phone: item.phone?.trim(), linkedinUrl: item.linkedinUrl?.trim(), source: item.source.trim(), sourceUrl: item.sourceUrl?.trim(), evidenceId: item.evidenceId, confidence: item.confidence ?? 50, lastSeenAt: new Date() },
+        });
+      }
+      for (const item of financials || []) {
+        const date = item.publishedAt ? new Date(item.publishedAt) : null;
+        await prisma.financialRecord.upsert({
+          where: { companyId_period_statementType_source: { companyId: record.id, period: item.period.trim(), statementType: item.statementType.trim(), source: item.source.trim() } },
+          create: { companyId: record.id, period: item.period.trim(), statementType: item.statementType.trim(), currency: item.currency?.trim() || null, source: item.source.trim(), sourceUrl: item.sourceUrl?.trim() || null, publishedAt: date && !Number.isNaN(date.getTime()) ? date : null, summary: item.summary?.trim() || null, metrics: item.metrics, evidenceId: item.evidenceId || null, confidence: item.confidence ?? 50 },
+          update: { currency: item.currency?.trim(), sourceUrl: item.sourceUrl?.trim(), publishedAt: date && !Number.isNaN(date.getTime()) ? date : undefined, summary: item.summary?.trim(), metrics: item.metrics, evidenceId: item.evidenceId, confidence: item.confidence ?? 50, observedAt: new Date() },
+        });
+      }
+      const payload = await prisma.company.findUnique({
+        where: { id: record.id },
+        select: { name: true, contacts: { orderBy: { lastSeenAt: "desc" }, take: 100 }, financialRecords: { orderBy: [{ publishedAt: "desc" }, { observedAt: "desc" }], take: 30 } },
+      });
+      return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }], structuredContent: payload || {} };
+    },
+  );
+
   return server;
 }, { legacy: "stateless", responseMode: "json" });
 
