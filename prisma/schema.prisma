@@ -111,6 +111,7 @@ model User {
   userWatches       UserWatch[]
   opportunities     OpportunityCandidate[]
   notifications     Notification[]
+  auditEvents       AuditEvent[]
   pilotCodes        PilotCode[]
   accessTokens      AccessToken[]
   @@schema("hunt")
@@ -259,5 +260,20 @@ model Notification {
   cluster       SignalCluster? @relation(fields: [clusterId], references: [id], onDelete: SetNull)
   opportunity   OpportunityCandidate? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
   @@index([userId, readAt, createdAt])
+  @@schema("hunt")
+}
+
+
+model AuditEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  resource  String
+  resourceId String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
   @@schema("hunt")
 }
