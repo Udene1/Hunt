@@ -19,6 +19,7 @@ async function persist(
       unchangedObservationCount: 0,
       changedObservationCount: 0,
       previousObservationCount: 0,
+      lifecycleEvents: [],
     };
   }
 
@@ -278,6 +279,7 @@ async function persist(
       previousObservationCount: 0,
       changedCategories: [],
       clusterCategories: [],
+      lifecycleEvents: [],
     };
   }
 }
