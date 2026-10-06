@@ -12,7 +12,7 @@ async function sha256(value: string) {
 }
 
 function clean(value: string) {
-  return value.replace(/<script[\\s\\S]*?<\\/script>/gi, " ").replace(/<style[\\s\\S]*?<\\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/\\s+/g, " ").trim();
+  return value.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/\s+/g, " ").trim();
 }
 
 function absolute(base: string, href: string) {
@@ -55,7 +55,7 @@ export const publicSignalAdapter: SignalAdapter = {
         const html = (await response.text()).slice(0, 500_000);
         const text = clean(html);
         if (!text) continue;
-        const title = clean(html.match(/<title[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1] || "");
+        const title = clean(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "");
 
         for (const rule of rules) {
           const match = text.match(rule.pattern);
@@ -74,7 +74,7 @@ export const publicSignalAdapter: SignalAdapter = {
           });
         }
 
-        const anchors = Array.from(html.matchAll(/<a[^>]+href=["']([^"']+)["'][^>]*>([\\s\\S]*?)<\\/a>/gi));
+        const anchors = Array.from(html.matchAll(/<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi));
         for (const anchor of anchors) {
           const label = clean(anchor[2]);
           const href = absolute(url, anchor[1]);
