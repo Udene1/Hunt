@@ -1,6 +1,7 @@
 import { detectProductSurfaces, type SurfaceProbe } from "./product-surfaces";
 import { githubAdapter } from "./github-signals";
 import { collectCompanyPeopleAndFinance, type DiscoveredContact, type DiscoveredFinancialRecord } from "./company-people-finance";
+import { publicSignalAdapter } from "./public-signal-adapter";
 
 export type Observation = {
   source: string;
@@ -372,6 +373,7 @@ export const SIGNAL_ADAPTERS: SignalAdapter[] = [
   productSurfaceAdapter,
   githubAdapter,
   peopleFinanceAdapter,
+  publicSignalAdapter,
 ];
 
 export async function collectObservations(company: string, domain: string | null) {
