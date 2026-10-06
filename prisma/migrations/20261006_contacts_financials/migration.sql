@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS "hunt"."CompanyContact" (
   "id" TEXT NOT NULL,
   "companyId" TEXT NOT NULL,
   "name" TEXT NOT NULL,
-  "role" TEXT,
+  "role" TEXT NOT NULL DEFAULT '',
   "email" TEXT,
   "phone" TEXT,
   "linkedinUrl" TEXT,
