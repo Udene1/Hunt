@@ -197,8 +197,8 @@ const handler = createMcpHandler(({ requestInfo }) => {
         where: { name: { equals: company, mode: "insensitive" } },
         select: {
           name: true, domain: true, country: true, generalSummary: true,
-          contacts: { orderBy: { lastSeenAt: "desc" }, take: 30 },
-          financialRecords: { orderBy: [{ publishedAt: "desc" }, { observedAt: "desc" }], take: 10 },
+          contacts: { where: { verificationStatus: "verified" }, orderBy: { lastSeenAt: "desc" }, take: 30 },
+          financialRecords: { where: { verificationStatus: "verified" }, orderBy: [{ publishedAt: "desc" }, { observedAt: "desc" }], take: 10 },
         },
       });
       if (!record) return { content: [{ type: "text", text: "Company not found in Hunt history." }], isError: true };
