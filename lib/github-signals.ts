@@ -367,9 +367,10 @@ const githubAdapter = {
     // Keep the public sensing adapter bounded: one discovery query and a small
     // amount of activity evidence per candidate repository.
     for (const repo of repos.slice(0, 2)) {
-      const [events, releases] = await Promise.all([
+      const [events, releases, content] = await Promise.all([
         collectRepoEvents(repo),
         collectReleases(repo),
+        collectRepoContent(repo),
       ]);
       observations.push(...events.observations, ...releases.observations, ...content.observations);
       if (events.activitySnapshot) {
