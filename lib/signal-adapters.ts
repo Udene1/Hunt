@@ -2,6 +2,7 @@ import { detectProductSurfaces, type SurfaceProbe } from "./product-surfaces";
 import { githubAdapter } from "./github-signals";
 import { collectCompanyPeopleAndFinance, type DiscoveredContact, type DiscoveredFinancialRecord } from "./company-people-finance";
 import { publicSignalAdapter } from "./public-signal-adapter";
+import type { FinancialDocumentIssue } from "./financial-document-extractor";
 
 export type Observation = {
   source: string;
@@ -20,6 +21,7 @@ export type SignalAdapterResult = {
   probes?: SurfaceProbe[];
   contacts?: DiscoveredContact[];
   financials?: DiscoveredFinancialRecord[];
+  reviewIssues?: FinancialDocumentIssue[];
 };
 
 export type SignalAdapter = {
