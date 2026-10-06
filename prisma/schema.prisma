@@ -100,6 +100,7 @@ model User {
   profile          UserProfile?
   sessions         Session[]
   userWatches       UserWatch[]
+  pilotCodes        PilotCode[]
   @@schema("hunt")
 }
 
@@ -143,5 +144,19 @@ model UserWatch {
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   @@unique([userId, companyId])
   @@index([userId, createdAt])
+  @@schema("hunt")
+}
+
+
+model PilotCode {
+  id               String   @id @default(cuid())
+  codeHash         String   @unique
+  createdAt        DateTime @default(now())
+  expiresAt        DateTime?
+  durationDays     Int      @default(14)
+  redeemedAt       DateTime?
+  redeemedByUserId String?
+  redeemedBy       User?    @relation(fields: [redeemedByUserId], references: [id], onDelete: SetNull)
+  @@index([expiresAt])
   @@schema("hunt")
 }
