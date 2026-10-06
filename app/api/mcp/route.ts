@@ -144,6 +144,36 @@ const handler = createMcpHandler(({ requestInfo }) => {
   return server;
 }, { legacy: "stateless", responseMode: "json" });
 
+const requestCounts = new Map<string, { count: number; resetAt: number }>();
+
+function securityCheck(request: Request) {
+  const length = Number(request.headers.get("content-length") || 0);
+  if (length > 1024 * 1024) return new Response(JSON.stringify({ error: "Request too large." }), { status: 413, headers: { "content-type": "application/json" } });
+
+  const configuredHosts = (process.env.HUNT_MCP_ALLOWED_HOSTS || "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean);
+  const host = (request.headers.get("host") || "").toLowerCase().split(":")[0];
+  if (configuredHosts.length && host && !configuredHosts.includes(host)) {
+    return new Response(JSON.stringify({ error: "Host not allowed." }), { status: 403, headers: { "content-type": "application/json" } });
+  }
+
+  const origin = request.headers.get("origin");
+  if (origin) {
+    const allowedOrigins = (process.env.HUNT_MCP_ALLOWED_ORIGINS || "").split(",").map((x) => x.trim()).filter(Boolean);
+    if (allowedOrigins.length && !allowedOrigins.includes(origin)) {
+      return new Response(JSON.stringify({ error: "Origin not allowed." }), { status: 403, headers: { "content-type": "application/json" } });
+    }
+  }
+
+  const bearer = request.headers.get("authorization") || "";
+  const key = bearer.startsWith("Bearer ") ? bearer.slice(7, 47) : (request.headers.get("x-forwarded-for") || "anonymous").split(",")[0].trim();
+  const now = Date.now();
+  const current = requestCounts.get(key);
+  if (!current || current.resetAt <= now) requestCounts.set(key, { count: 1, resetAt: now + 60_000 });
+  else if (current.count >= 60) return new Response(JSON.stringify({ error: "Rate limit exceeded." }), { status: 429, headers: { "content-type": "application/json", "retry-after": "60" } });
+  else current.count++;
+  return null;
+}
+
 async function authorized(request: Request) {
   if (!databaseConfigured()) return new Response(JSON.stringify({ error: "Database unavailable" }), { status: 503, headers: { "content-type": "application/json" } });
   const user = await getBearerUser(request);
@@ -160,18 +190,24 @@ async function authorized(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const security = securityCheck(request);
+  if (security) return security;
   const rejected = await authorized(request);
   if (rejected) return rejected;
   return handler.fetch(request);
 }
 
 export async function GET(request: Request) {
+  const security = securityCheck(request);
+  if (security) return security;
   const rejected = await authorized(request);
   if (rejected) return rejected;
   return handler.fetch(request);
 }
 
 export async function DELETE(request: Request) {
+  const security = securityCheck(request);
+  if (security) return security;
   const rejected = await authorized(request);
   if (rejected) return rejected;
   return handler.fetch(request);
