@@ -15,6 +15,7 @@ type GitHubRepo = {
   forks_count?: number;
   language?: string | null;
   owner?: { login?: string; html_url?: string };
+  default_branch?: string;
 };
 
 type GitHubEvent = {
@@ -89,6 +90,16 @@ async function sha256(value: string) {
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+function classifyRepository(repo: GitHubRepo) {
+  const text = [repo.name, repo.description].filter(Boolean).join(" ").toLowerCase();
+  if (/sdk|api|openapi|swagger|developer|client|integration/.test(text)) return "API / SDK";
+  if (/infra|infrastructure|platform|cloud|devops|terraform|kubernetes|docker/.test(text)) return "Infrastructure / platform";
+  if (/security|auth|identity|iam|fraud|compliance/.test(text)) return "Security";
+  if (/docs|documentation|example|sample|demo/.test(text)) return "Documentation / examples";
+  if (/tool|cli|plugin|extension|action/.test(text)) return "Developer tooling";
+  return "Application / product";
+}
+
 async function observeRepo(repo: GitHubRepo) {
   return {
     source: "GitHub",
@@ -108,6 +119,8 @@ async function observeRepo(repo: GitHubRepo) {
       fork: Boolean(repo.fork),
       archived: Boolean(repo.archived),
       pushedAt: repo.pushed_at || "",
+      defaultBranch: repo.default_branch || "",
+      repositoryPurpose: classifyRepository(repo),
     },
   } satisfies Observation;
 }
@@ -160,7 +173,18 @@ async function collectRepoEvents(repo: GitHubRepo) {
       });
     }
   }
-  return { observations, error: null as string | null };
+  const now = Date.now();
+  const windowStart = new Date(now - 7 * 86400000);
+  const recentEvents = result.data.filter((event) => event.created_at && new Date(event.created_at).getTime() >= windowStart.getTime());
+  const pushCount = recentEvents.filter((event) => event.type === "PushEvent").length;
+  const pullRequestCount = recentEvents.filter((event) => event.type === "PullRequestEvent").length;
+  const releaseCount = recentEvents.filter((event) => event.type === "ReleaseEvent").length;
+
+  return {
+    observations,
+    activitySnapshot: { repository: repo.full_name, repositoryId: repo.id, windowStart: windowStart.toISOString(), windowEnd: new Date(now).toISOString(), eventCount: recentEvents.length, pushCount, pullRequestCount, releaseCount },
+    error: null as string | null,
+  };
 }
 
 async function discoverGitHubOwners(domain: string | null): Promise<string[]> {
@@ -272,6 +296,22 @@ const githubAdapter = {
         collectReleases(repo),
       ]);
       observations.push(...events.observations, ...releases.observations);
+      if (events.activitySnapshot) {
+        observations.push({
+          source: "GitHub", type: "technology",
+          title: "7-day repository activity: " + repo.full_name,
+          category: "Engineering / GitHub velocity", url: repo.html_url,
+          observedAt: events.activitySnapshot.windowEnd,
+          fingerprint: await sha256("github|activity-window|" + repo.id + "|" + events.activitySnapshot.windowStart),
+          metadata: {
+            repository: repo.full_name, repositoryId: repo.id,
+            windowStart: events.activitySnapshot.windowStart, windowEnd: events.activitySnapshot.windowEnd,
+            eventCount: events.activitySnapshot.eventCount, pushCount: events.activitySnapshot.pushCount,
+            pullRequestCount: events.activitySnapshot.pullRequestCount, releaseCount: events.activitySnapshot.releaseCount,
+            repositoryPurpose: classifyRepository(repo),
+          },
+        });
+      }
       if (events.error) errors.push(repo.full_name + ": " + events.error);
       if (releases.error) errors.push(repo.full_name + ": " + releases.error);
     }
