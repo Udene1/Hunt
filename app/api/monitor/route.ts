@@ -37,14 +37,14 @@ async function persist(
       });
       for (const contact of contacts) {
         await tx.companyContact.upsert({
-          where: { companyId_name_role: { companyId: dbCompany.id, name: contact.name, role: contact.role } },
+          where: { companyId_name_role: { companyId: dbCompany.id, name: contact.name, role: contact.role || "" } },
           update: {
             email: contact.email, phone: contact.phone, linkedinUrl: contact.linkedinUrl,
             source: contact.source, sourceUrl: contact.sourceUrl, confidence: contact.confidence, verificationStatus: contact.verificationStatus,
             lastSeenAt: new Date(),
           },
           create: {
-            companyId: dbCompany.id, name: contact.name, role: contact.role,
+            companyId: dbCompany.id, name: contact.name, role: contact.role || "",
             email: contact.email, phone: contact.phone, linkedinUrl: contact.linkedinUrl,
             source: contact.source, sourceUrl: contact.sourceUrl, confidence: contact.confidence, verificationStatus: contact.verificationStatus,
           },
