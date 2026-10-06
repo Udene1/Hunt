@@ -87,6 +87,7 @@ export async function collectCompanyPeopleAndFinance(company: string, domain: st
   const observations: Observation[] = [];
   const errors: string[] = [];
   const reviewIssues: Array<FinancialDocumentIssue> = [];
+  let extractedFinancialDocuments = 0;
   if (!domain) return { contacts: [], financials: [], observations, errors };
 
   const root = "https://" + domain;
@@ -138,8 +139,9 @@ export async function collectCompanyPeopleAndFinance(company: string, domain: st
         const statementType = /quarter|q[1-4]/i.test(label + href) ? "quarterly" : /results/i.test(label) ? "results" : "annual";
         const fingerprint = await sha256("financial|" + href);
         let document: Awaited<ReturnType<typeof extractFinancialDocument>> | null = null;
-        if (/\.pdf(?:$|[?#])/i.test(href)) {
+        if (/\.pdf(?:$|[?#])/i.test(href) && extractedFinancialDocuments < 2) {
           try {
+            extractedFinancialDocuments++;
             document = await extractFinancialDocument(href);
             reviewIssues.push(...document.issues);
           } catch (error) {
