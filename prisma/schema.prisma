@@ -29,6 +29,8 @@ model Company {
   clusters    SignalCluster[]
   opportunities OpportunityCandidate[]
   notifications Notification[]
+  contacts     CompanyContact[]
+  financialRecords FinancialRecord[]
   @@schema("hunt")
 }
 
@@ -275,5 +277,47 @@ model AuditEvent {
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   @@index([userId, createdAt])
   @@index([action, createdAt])
+  @@schema("hunt")
+}
+
+model CompanyContact {
+  id          String   @id @default(cuid())
+  companyId   String
+  name        String
+  role        String?
+  email       String?
+  phone       String?
+  linkedinUrl String?
+  source      String
+  sourceUrl   String?
+  evidenceId  String?
+  confidence  Int      @default(50)
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  @@index([companyId, lastSeenAt])
+  @@index([companyId, role])
+  @@unique([companyId, name, role])
+  @@schema("hunt")
+}
+
+model FinancialRecord {
+  id             String   @id @default(cuid())
+  companyId      String
+  period         String
+  statementType  String
+  currency       String?
+  source         String
+  sourceUrl      String?
+  publishedAt    DateTime?
+  observedAt     DateTime @default(now())
+  summary        String?
+  metrics        Json?
+  evidenceId     String?
+  confidence     Int      @default(50)
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  @@unique([companyId, period, statementType, source])
+  @@index([companyId, publishedAt])
+  @@index([companyId, observedAt])
   @@schema("hunt")
 }
