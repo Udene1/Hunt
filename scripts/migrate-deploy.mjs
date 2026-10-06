@@ -11,7 +11,22 @@ function run(args) {
 
 if (run(["deploy"])) process.exit(0);
 
-console.log("Prisma reported an existing non-empty database. Applying the recorded Hunt baseline markers once.");
-execFileSync("npx", ["prisma", "migrate", "resolve", "--applied", "00000000000000_init"], { stdio: "inherit", env: process.env });
-execFileSync("npx", ["prisma", "migrate", "resolve", "--applied", "20261006_admin_summary_and_access_tokens"], { stdio: "inherit", env: process.env });
+console.log("Prisma reported an existing non-empty database. Ensuring the recorded Hunt baseline markers are present.");
+
+for (const migration of [
+  "00000000000000_init",
+  "20261006_admin_summary_and_access_tokens",
+]) {
+  try {
+    execFileSync(
+      "npx",
+      ["prisma", "migrate", "resolve", "--applied", migration],
+      { stdio: "inherit", env: process.env },
+    );
+  } catch {
+    // P3008 means the migration is already recorded as applied; any other
+    // error will be surfaced by the final migrate deploy below.
+  }
+}
+
 execFileSync("npx", ["prisma", "migrate", "deploy"], { stdio: "inherit", env: process.env });
