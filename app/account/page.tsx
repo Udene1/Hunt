@@ -23,6 +23,8 @@ export default function AccountPage() {
   const [profile, setProfile] = useState<Profile>({});
   const [status, setStatus] = useState("");
   const [saving, setSaving] = useState(false);
+  const [pilotPin, setPilotPin] = useState("");
+  const [redeeming, setRedeeming] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/me", { cache: "no-store" }).then(async (r) => {
@@ -78,6 +80,19 @@ export default function AccountPage() {
     setStatus("Profile saved. Hunt can now use these objectives for deterministic relevance matching.");
   }
 
+  async function redeemPilot(e: React.FormEvent) {
+    e.preventDefault();
+    setRedeeming(true);
+    setStatus("");
+    const r = await fetch("/api/pilot/redeem", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: pilotPin }) });
+    const data = await r.json().catch(() => ({}));
+    setRedeeming(false);
+    if (!r.ok) return setStatus(data.error || "Could not activate pilot.");
+    setUser(data.user);
+    setPilotPin("");
+    setStatus("Pilot activated. Monitoring and watchlists are now enabled until " + new Date(data.user.pilotExpiresAt).toLocaleDateString() + ".");
+  }
+
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
@@ -109,6 +124,15 @@ export default function AccountPage() {
         <section className="hero" style={{ maxWidth: 760 }}>
           <div className="sectionHead"><div><p className="eyebrow">YOUR HUNT PROFILE</p><h1 style={{ fontSize: 46, margin: 0 }}>{user.email}</h1></div><button className="refresh" onClick={logout}>Sign out</button></div>
           <p className="sub">Plan: <strong>{user.plan}</strong>{user.pilotExpiresAt ? " · pilot expires " + new Date(user.pilotExpiresAt).toLocaleDateString() : ""}</p>
+          {user.plan === "free" && (
+            <form className="card" onSubmit={redeemPilot}>
+              <p className="eyebrow">PILOT ACCESS</p>
+              <h2>Have a pilot PIN?</h2>
+              <p>PINs are activation codes only. Hunt exchanges a valid PIN for your authenticated pilot session; the PIN is not a permanent credential.</p>
+              <input required inputMode="numeric" maxLength={8} value={pilotPin} onChange={(e) => setPilotPin(e.target.value.replace(/\D/g, "").slice(0, 8))} placeholder="8-digit PIN" style={{ width: "100%", padding: 12, border: "1px solid #d5d2c9", borderRadius: 8, marginBottom: 12 }} />
+              <button className="watch" type="submit">{redeeming ? "Activating…" : "Activate pilot →"}</button>
+            </form>
+          )}
           <form className="card" onSubmit={saveProfile}>
             <label>Profession / what you sell<input name="profession" defaultValue={profile.profession || ""} placeholder="Backend / infrastructure engineer" /></label>
             <label>Services<input name="services" defaultValue={listValue(profile.services)} placeholder="backend engineering, cloud reliability, security" /></label>
