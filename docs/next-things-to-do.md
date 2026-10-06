@@ -43,36 +43,44 @@ This file is the working thread for Hunt after the core sensing, evidence, histo
 - [ ] Run the smoke test against the deployed endpoint.
 - [ ] Test with an actual external MCP client before claiming broad GPT/Claude compatibility.
 
-## 6. Add change-focused investigation
-- Add a get_company_changes capability that summarizes durable changes, prior state, current state, clusters, and evidence.
+## 6. Add change-focused investigation — IMPLEMENTED
+- [x] Add `/api/changes` for authenticated change-focused evidence.
+- [x] Add `get_company_changes` to user MCP.
+- [x] Return current evidence, confirmed removals, durable clusters and recent signals.
 
-## 7. Make signal clusters first-class
-- Combine independent observations into stronger intersections.
-- Keep jobs as one adapter, never the product itself.
-- Preserve evidence supporting every cluster.
+## 7. Make signal clusters first-class — IMPLEMENTED
+- [x] Persist cross-category signal intersections as durable `SignalCluster` records.
+- [x] Store categories, score, supporting evidence IDs and monitoring run.
+- [x] Keep jobs as one adapter, never the product itself.
 
-## 8. Add deterministic opportunity candidates
-- Company change -> signal cluster -> deterministic relevance -> opportunity candidate.
-- Store evidence IDs, reason, relevance, status, timestamps, and investigation state.
-- External AI remains the investigator; Hunt does not make the sales decision.
+## 8. Add deterministic opportunity candidates — IMPLEMENTED
+- [x] Company change -> signal cluster -> deterministic relevance -> opportunity candidate.
+- [x] Store evidence IDs, reason, score, status, timestamps and investigation state.
+- [x] Scope candidates to the user watch + commercial profile.
+- [x] External AI remains the investigator; Hunt does not make the sales decision.
 
-## 9. Add notifications
-- Notify when relevant changes, clusters, or opportunity candidates appear.
-- Later support MCP events/tasks, web push, email, and in-app notifications as appropriate.
+## 9. Add notifications — IMPLEMENTED (in-app foundation)
+- [x] Create durable user notifications for newly created opportunity candidates.
+- [x] Add authenticated notification API with read acknowledgement.
+- [x] Expose opportunity and notification feeds in the account UI.
+- [ ] Later add MCP events/tasks, web push and email delivery.
 
-## 10. Production hardening
-- Rate limits and abuse protection.
-- Token revocation and audit events.
-- MCP host/origin validation.
-- Request/payload limits.
-- Adapter timeouts and retries.
-- Observability and operational error reporting.
-- Database/index review.
+## 10. Production hardening — PARTIALLY IMPLEMENTED
+- [x] MCP request size limit.
+- [x] MCP host/origin allowlists when configured.
+- [x] Lightweight per-instance MCP rate limiting.
+- [x] Existing bearer token revocation/expiry checks remain authoritative.
+- [x] Adapter timeouts are already used on external probes.
+- [ ] Durable audit-event trail.
+- [ ] Production observability/error alerting.
+- [ ] Final database/index review after live migration.
 
-## 11. Run the complete real-user product test
-- Register -> profile -> pilot -> browse -> watch -> monitor -> durable history -> MCP investigation -> admin summary -> public summary.
-- Confirm the complete loop works without manual database intervention.
-- Only after this should the product be treated as pilot-ready.
+## 11. Run the complete real-user product test — READY / PRODUCTION VERIFICATION PENDING
+- [x] Code path exists for register -> profile -> pilot -> browse -> watch -> monitor -> durable history -> MCP investigation -> admin summary -> public summary.
+- [x] Opportunity and notification paths are now part of the product loop.
+- [ ] Verify the complete loop against the newly deployed production build and Neon migration.
+- [ ] Confirm no manual database intervention is required.
+- [ ] Only after this should the product be treated as pilot-ready.
 
 ## Architecture rules
 - Hunt observes public reality and preserves evidence/history.
