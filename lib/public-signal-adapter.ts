@@ -1,4 +1,10 @@
-import type { Observation, SignalAdapter, SignalAdapterResult } from "./signal-adapters";
+type Observation = {
+  source: string; type: "job" | "website" | "product" | "technology" | "security" | "funding" | "leadership" | "regulatory" | "procurement" | "partnership" | "location";
+  title: string; category: string; url: string | null; observedAt: string; fingerprint: string;
+  metadata?: Record<string, string | number | boolean>;
+};
+type SignalAdapterResult = { observations: Observation[]; errors: string[] };
+type SignalAdapter = { id: string; collect(company: string, domain: string | null): Promise<SignalAdapterResult> };
 
 async function sha256(value: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
