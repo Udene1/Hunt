@@ -29,6 +29,7 @@ model Company {
   clusters    SignalCluster[]
   opportunities OpportunityCandidate[]
   notifications Notification[]
+  adminReviewTasks AdminReviewTask[]
   contacts     CompanyContact[]
   financialRecords FinancialRecord[]
   @@schema("hunt")
@@ -321,5 +322,37 @@ model FinancialRecord {
   @@unique([companyId, period, statementType, source])
   @@index([companyId, publishedAt])
   @@index([companyId, observedAt])
+  @@schema("hunt")
+}
+
+
+model AdminReviewTask {
+  id          String   @id @default(cuid())
+  companyId   String?
+  type        String
+  severity    String   @default("high")
+  title       String
+  detail      String
+  sourceUrl   String?
+  fingerprint String   @unique
+  metadata    Json?
+  status      String   @default("open")
+  createdAt   DateTime @default(now())
+  resolvedAt  DateTime?
+  resolvedBy  String?
+  company     Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  @@index([status, createdAt])
+  @@index([companyId, status])
+  @@schema("hunt")
+}
+
+model AdminPushSubscription {
+  id         String   @id @default(cuid())
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime?
+  @@index([lastUsedAt])
   @@schema("hunt")
 }
