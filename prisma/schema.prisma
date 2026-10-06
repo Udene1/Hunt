@@ -86,3 +86,47 @@ model Signal {
   @@index([companyId, createdAt])
   @@schema("hunt")
 }
+
+
+model User {
+  id               String        @id @default(cuid())
+  email            String        @unique
+  passwordHash     String
+  plan             String        @default("free")
+  pilotExpiresAt   DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  profile          UserProfile?
+  sessions         Session[]
+  @@schema("hunt")
+}
+
+model UserProfile {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  profession            String?
+  services              Json?
+  industries            Json?
+  geography             String?
+  idealCustomer         String?
+  targetCompanies       Json?
+  desiredSignals        Json?
+  exclusions            Json?
+  commercialObjectives  Json?
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  @@schema("hunt")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([expiresAt])
+  @@schema("hunt")
+}
