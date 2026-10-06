@@ -64,3 +64,19 @@ export async function destroyCurrentSession() {
 }
 
 export { hashPassword, verifyPassword };
+
+
+export async function getBearerUser(request: Request) {
+  const header = request.headers.get("authorization") || "";
+  if (!header.startsWith("Bearer ")) return null;
+  const token = header.slice(7).trim();
+  if (!token) return null;
+  const access = await prisma.accessToken.findUnique({
+    where: { tokenHash: hashToken(token) },
+    include: { user: { include: { profile: true } } },
+  });
+  if (!access || access.revokedAt) return null;
+  if (access.user.plan === "pilot" && (!access.user.pilotExpiresAt || access.user.pilotExpiresAt <= new Date())) return null;
+  await prisma.accessToken.update({ where: { id: access.id }, data: { lastUsedAt: new Date() } }).catch(() => {});
+  return access.user;
+}
