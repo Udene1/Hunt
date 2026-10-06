@@ -63,7 +63,7 @@ async function persist(
       let changedObservationCount = 0;
       const changedObservations: Observation[] = [];
       const lifecycleEvents: Array<{
-        kind: "removed" | "restored";
+        kind: "removed" | "restored" | "moved";
         probe: SurfaceProbe;
         observationId: string;
         missCount?: number;
@@ -217,20 +217,43 @@ async function persist(
         });
       }
 
+      // A disappearing surface plus a newly reachable surface with the same
+      // semantic label is more likely a migration than a retirement.
+      for (const event of lifecycleEvents.filter((item) => item.kind === "removed")) {
+        const replacementProbe = probes.find((probe) =>
+          probe.status === "present" &&
+          probe.label === event.probe.label &&
+          probe.surfaceIdentity !== event.probe.surfaceIdentity
+        );
+        if (replacementProbe) {
+          event.kind = "moved";
+          event.probe = replacementProbe;
+        }
+      }
+
       for (const event of lifecycleEvents) {
         const removed = event.kind === "removed";
+        const moved = event.kind === "moved";
         await tx.signal.create({
           data: {
             companyId: dbCompany.id,
             runId: run.id,
-            score: removed ? 68 : 56,
-            headline: removed ? "Public product surface removed" : "Public product surface restored",
+            score: removed ? 68 : moved ? 74 : 56,
+            headline: removed
+              ? "Public product surface removed"
+              : moved
+                ? "Public product surface migrated"
+                : "Public product surface restored",
             detail: removed
               ? event.probe.label + " at " + event.probe.path + " returned " + event.probe.httpStatus + " on two consecutive monitoring runs. The surface was previously observed and is now treated as historically removed."
-              : event.probe.label + " at " + event.probe.path + " became reachable again after a confirmed removal state. Investigate whether the surface was restored, migrated, or replaced.",
+              : moved
+                ? event.probe.label + " changed public location while another surface with the same label became reachable. Treat this as a likely migration rather than a confirmed retirement."
+                : event.probe.label + " at " + event.probe.path + " became reachable again after a confirmed removal state. Investigate whether the surface was restored, migrated, or replaced.",
             commercialInterpretation: removed
               ? "Historical product/API change; investigate whether the capability was retired, migrated or replaced"
-              : "Historical product/API restoration; investigate the current surface and any migration or relaunch",
+              : moved
+                ? "Potential product/API migration; investigate the replacement surface, documentation changes and integration impact"
+                : "Historical product/API restoration; investigate the current surface and any migration or relaunch",
           },
         });
       }
