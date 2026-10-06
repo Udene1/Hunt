@@ -19,6 +19,8 @@ type Monitor = {
   persistence?: { status: string; note: string };
 };
 
+type CompanyProfile = { company: { name: string; domain: string | null; country: string; summary: string | null }; contacts: { id: string; name: string; role: string; email: string | null; phone: string | null; linkedinUrl: string | null; source: string; sourceUrl: string | null; confidence: number; lastSeenAt: string }[]; financials: { id: string; period: string; statementType: string; currency: string | null; source: string; sourceUrl: string | null; publishedAt: string | null; summary: string | null; metrics: Record<string, unknown> | null; confidence: number }[]; };
+
 type History = {
   persistent: boolean;
   observationCount: number;
@@ -36,6 +38,7 @@ export default function Home() {
   const [active, setActive] = useState<string | null>(null);
   const [monitor, setMonitor] = useState<Record<string, Monitor>>({});
   const [history, setHistory] = useState<Record<string, History>>({});
+  const [profiles, setProfiles] = useState<Record<string, CompanyProfile>>({});
   const [loading, setLoading] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState<string | null>(null);
   const [watchPersistent, setWatchPersistent] = useState(false);
@@ -64,12 +67,21 @@ export default function Home() {
     return companies.filter((c) => [c.name, c.domain, c.description, ...c.sectors].join(" ").toLowerCase().includes(needle));
   }, [companies, q]);
 
+  async function loadProfile(company: string) {
+    try {
+      const r = await fetch("/api/company-profile?company=" + encodeURIComponent(company), { cache: "no-store" });
+      const data = await r.json();
+      if (r.ok) setProfiles((p) => ({ ...p, [company]: data }));
+    } catch {}
+  }
+
   async function loadHistory(company: string) {
     setHistoryLoading(company);
     try {
       const r = await fetch("/api/history?company=" + encodeURIComponent(company), { cache: "no-store" });
       const data = await r.json();
       if (r.ok) setHistory((h) => ({ ...h, [company]: data }));
+      await loadProfile(company);
     } finally { setHistoryLoading(null); }
   }
 
