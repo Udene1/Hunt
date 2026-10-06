@@ -4,6 +4,7 @@ import { findCompany, normalizeCompany } from "../../../lib/companies";
 import { collectObservations, type Observation } from "../../../lib/signal-adapters";
 import { requireMonitoringAccess } from "../../../lib/entitlements";
 import type { SurfaceProbe } from "../../../lib/product-surfaces";
+import { scoreCompanyRelevance } from "../../../lib/relevance";
 
 async function persist(
   company: string,
@@ -218,6 +219,66 @@ async function persist(
         });
       }
 
+      let clusterCreated = false;
+      let clusterId: string | null = null;
+      let opportunityCount = 0;
+      const clusterEvidence = await tx.observation.findMany({
+        where: { runId: run.id },
+        select: { id: true, title: true, category: true, source: true, url: true, observedAt: true, metadata: true },
+        orderBy: { observedAt: "desc" },
+      });
+      const clusterCategorySet = Array.from(new Set(clusterEvidence.map((item) => item.category)));
+      const clusterEvidenceIds = clusterEvidence.map((item) => item.id);
+      if (hasHistoricalBaseline && clusterCategorySet.length >= 2 && clusterEvidenceIds.length >= 2) {
+        const clusterFingerprint = clusterCategorySet.slice().sort().join("|").toLowerCase();
+        const clusterScore = Math.min(99, 60 + Math.min(clusterCategorySet.length, 5) * 6 + Math.min(changedObservationCount, 5) * 2);
+        const clusterHeadline = clusterCategorySet.slice(0, 3).join(" + ") + " intersection";
+        const clusterDetail = clusterEvidence.length + " current observations intersect across " + clusterCategorySet.length + " signal categories. Hunt stores the evidence; an external AI should investigate whether the intersection represents a commercial opportunity.";
+        const cluster = await tx.signalCluster.upsert({
+          where: { companyId_fingerprint: { companyId: dbCompany.id, fingerprint: clusterFingerprint } },
+          update: { runId: run.id, score: clusterScore, headline: clusterHeadline, detail: clusterDetail, categories: clusterCategorySet, evidenceIds: clusterEvidenceIds, lastSeenAt: new Date() },
+          create: { companyId: dbCompany.id, runId: run.id, fingerprint: clusterFingerprint, score: clusterScore, headline: clusterHeadline, detail: clusterDetail, categories: clusterCategorySet, evidenceIds: clusterEvidenceIds },
+        });
+        clusterId = cluster.id;
+        clusterCreated = true;
+
+        const watchedUsers = await tx.user.findMany({
+          where: { userWatches: { some: { companyId: dbCompany.id } } },
+          include: { profile: true },
+        });
+        for (const watchedUser of watchedUsers) {
+          const relevance = scoreCompanyRelevance(
+            watchedUser.profile || {},
+            dbCompany,
+            clusterEvidence.map((item) => ({ ...item, observedAt: item.observedAt })),
+          );
+          if (relevance.score < 20 || relevance.confidence === "none") continue;
+          const candidateFingerprint = clusterFingerprint + "|" + cluster.id;
+          const existingCandidate = await tx.opportunityCandidate.findUnique({
+            where: { userId_fingerprint: { userId: watchedUser.id, fingerprint: candidateFingerprint } },
+          });
+          const candidate = await tx.opportunityCandidate.upsert({
+            where: { userId_fingerprint: { userId: watchedUser.id, fingerprint: candidateFingerprint } },
+            update: { score: Math.min(99, Math.round((clusterScore + relevance.score) / 2)), reason: "A durable signal intersection matches the user's configured commercial objectives. Hunt does not decide whether the lead should be contacted.", evidenceIds: clusterEvidenceIds },
+            create: { userId: watchedUser.id, companyId: dbCompany.id, clusterId: cluster.id, fingerprint: candidateFingerprint, score: Math.min(99, Math.round((clusterScore + relevance.score) / 2)), reason: "A durable signal intersection matches the user's configured commercial objectives. Hunt does not decide whether the lead should be contacted.", evidenceIds: clusterEvidenceIds },
+          });
+          opportunityCount++;
+          if (!existingCandidate) {
+            await tx.notification.create({
+              data: {
+                userId: watchedUser.id,
+                companyId: dbCompany.id,
+                clusterId: cluster.id,
+                opportunityId: candidate.id,
+                type: "opportunity_candidate",
+                title: dbCompany.name + " has a relevant signal intersection",
+                body: clusterHeadline + ". Review the evidence before deciding whether to investigate or contact.",
+              },
+            });
+          }
+        }
+      }
+
       // A disappearing surface plus a newly reachable surface with the same
       // semantic label is more likely a migration than a retirement.
       for (const event of lifecycleEvents.filter((item) => item.kind === "removed")) {
@@ -280,6 +341,8 @@ async function persist(
         baselineCategories,
         historicalIntersection,
         crossSignal,
+        cluster: clusterId ? { id: clusterId, created: clusterCreated } : null,
+        opportunityCount,
         lifecycleEvents: lifecycleEvents.map((event) => ({
           kind: event.kind,
           path: event.probe.path,
@@ -393,6 +456,8 @@ export async function GET(request: Request) {
       lifecycleEventCount: persistence.lifecycleEvents?.length || 0,
     },
     lifecycle: persistence.lifecycleEvents || [],
+    cluster: persistence.cluster || null,
+    opportunityCount: persistence.opportunityCount || 0,
     signal,
     observations: unique.slice(0, 30),
     errors: collected.errors,
