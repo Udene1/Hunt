@@ -3,7 +3,6 @@ import { cookies } from "next/headers";
 import { prisma } from "./db";
 
 const COOKIE = "hunt_session";
-const ADMIN_COOKIE = "hunt_admin_session";
 const SESSION_DAYS = 30;
 
 function hashPassword(password: string) {
