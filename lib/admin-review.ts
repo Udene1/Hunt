@@ -38,7 +38,7 @@ export async function createAdminReviewTasks(issues: ReviewIssue[]) {
         detail: issue.detail,
         sourceUrl: issue.sourceUrl ?? null,
         fingerprint: issue.fingerprint,
-        metadata: issue.metadata,
+        metadata: issue.metadata == null ? undefined : JSON.parse(JSON.stringify(issue.metadata)),
       },
     });
     created.push(task);
