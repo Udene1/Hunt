@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     prisma.adminReviewTask.count({ where: { status: "open" } }),
     prisma.company.count(),
     prisma.company.count({ where: { generalSummary: null } }),
-    prisma.company.count({ where: { generalSummary: { not: null }, OR: [{ summaryEvidenceAt: { gt: prisma.company.fields.summaryUpdatedAt } }] } }).catch(() => 0),
+    prisma.company.findMany({ where: { generalSummary: { not: null }, summaryEvidenceAt: { not: null } }, select: { summaryUpdatedAt: true, summaryEvidenceAt: true } }).then((rows) => rows.filter((row) => row.summaryEvidenceAt && (!row.summaryUpdatedAt || row.summaryEvidenceAt > row.summaryUpdatedAt)).length),
     prisma.user.findMany({ orderBy: { createdAt: "desc" }, take: 10, select: { email: true, plan: true, createdAt: true, updatedAt: true } }),
     prisma.auditEvent.findMany({ where: { action: { in: ["login", "register"] } }, orderBy: { createdAt: "desc" }, take: 500, select: { action: true, metadata: true, createdAt: true } }),
     prisma.monitoringRun.findMany({ orderBy: { startedAt: "desc" }, take: 10, include: { company: { select: { name: true } } } }),
