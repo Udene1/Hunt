@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma, databaseConfigured } from "../../../lib/db";
 import { findCompany, normalizeCompany } from "../../../lib/companies";
+import { discoverCompanyDomain } from "../../../lib/company-discovery";
 import { collectObservations, type Observation } from "../../../lib/signal-adapters";
 import { requireMonitoringAccess } from "../../../lib/entitlements";
 import type { SurfaceProbe } from "../../../lib/product-surfaces";
@@ -509,8 +510,11 @@ export async function GET(request: Request) {
   const domainCandidate = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.[a-z]{2,}(?:\.[a-z]{2,})?$/i.test(cleanedTarget)
     ? cleanedTarget.toLowerCase()
     : null;
-  const company = seed?.name || (domainCandidate ? cleanedTarget.split(".")[0].replace(/[-_]+/g, " ") : rawCompany);
-  const domain = seed?.domain || domainCandidate;
+  const discovered = seed || domainCandidate
+    ? { name: seed?.name || (domainCandidate ? cleanedTarget.split(".")[0].replace(/[-_]+/g, " ") : rawCompany), domain: seed?.domain || domainCandidate, source: seed ? "catalogue" as const : "input" as const }
+    : await discoverCompanyDomain(rawCompany);
+  const company = discovered.name;
+  const domain = discovered.domain;
   const collected = await collectObservations(company, domain);
 
   const unique = Array.from(new Map(collected.observations.map((x) => [x.fingerprint, x])).values());
@@ -562,7 +566,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     company,
     monitoredAt: new Date().toISOString(),
-    sources: { adapters: collected.adapters, website: domain },
+    sources: { adapters: collected.adapters, website: domain, domainDiscovery: discovered.source },
     baseline: {
       observationCount: unique.length,
       categories,
