@@ -39,11 +39,14 @@ function clean(value: string) {
 
 function extractJsonLd(html: string) {
   const values: unknown[] = [];
-  for (const match of html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+  const matches = html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+  let match = matches.next();
+  while (!match.done) {
     try {
-      const parsed = JSON.parse(match[1]);
+      const parsed = JSON.parse(match.value[1]);
       values.push(...(Array.isArray(parsed) ? parsed : [parsed]));
     } catch {}
+    match = matches.next();
   }
   return values;
 }
