@@ -14,9 +14,44 @@ function scoreCandidate(company: string, title: string, url: string) {
   return score;
 }
 
+async function verifyDomain(domain: string) {
+  try {
+    const response = await fetch("https://" + domain, {
+      method: "GET",
+      redirect: "follow",
+      cache: "no-store",
+      headers: { "user-agent": "Opportunity-Intelligence/0.2 company-discovery" },
+    });
+    if (!response.ok) return null;
+    const finalUrl = new URL(response.url);
+    return finalUrl.hostname.toLowerCase().replace(/^www\\./, "");
+  } catch {
+    return null;
+  }
+}
+
 export async function discoverCompanyDomain(company: string) {
   const seed = findCompany(company);
   if (seed) return { name: seed.name, domain: seed.domain, source: "catalogue" as const };
+
+  const normalized = normalizeToken(company);
+  const compact = normalized.replace(/\\s+/g, "");
+  const words = normalized.split(" ").filter(Boolean);
+  const suffixFree = words.filter((word) => !/^(plc|limited|ltd|inc|incorporated|company|co)$/.test(word));
+  const candidates = Array.from(new Set([
+    compact + ".com",
+    suffixFree.join("") + ".com",
+    suffixFree.join("-") + ".com",
+    compact + ".com.ng",
+    suffixFree.join("") + ".com.ng",
+    suffixFree.join("-") + ".com.ng",
+    compact + ".ng",
+  ]));
+
+  for (const candidate of candidates) {
+    const domain = await verifyDomain(candidate);
+    if (domain) return { name: company, domain, source: "direct" as const };
+  }
 
   const query = encodeURIComponent(company + " Nigeria official website");
   const url = "https://html.duckduckgo.com/html/?q=" + query;
