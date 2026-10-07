@@ -64,7 +64,8 @@ async function persist(
           update: {
             currency: financial.currency, sourceUrl: financial.sourceUrl,
             publishedAt: financial.publishedAt ? new Date(financial.publishedAt) : null,
-            observedAt: new Date(), summary: financial.summary, metrics: financial.metrics,
+            observedAt: new Date(), summary: financial.summary,
+            metrics: financial.metrics == null ? undefined : JSON.parse(JSON.stringify(financial.metrics)),
             confidence: financial.confidence, verificationStatus: financial.verificationStatus,
           },
           create: {
@@ -72,7 +73,8 @@ async function persist(
             statementType: financial.statementType, currency: financial.currency,
             source: financial.source, sourceUrl: financial.sourceUrl,
             publishedAt: financial.publishedAt ? new Date(financial.publishedAt) : null,
-            observedAt: new Date(), summary: financial.summary, metrics: financial.metrics,
+            observedAt: new Date(), summary: financial.summary,
+            metrics: financial.metrics == null ? undefined : JSON.parse(JSON.stringify(financial.metrics)),
             confidence: financial.confidence, verificationStatus: financial.verificationStatus,
           },
         });
