@@ -83,7 +83,7 @@ export async function getBearerUser(request: Request) {
 export async function getAdminBearer(request: Request) {
   const header = request.headers.get("authorization") || "";
   const bearer = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
-  const token = bearer || request.headers.get("x-hunt-admin-session") || (request.headers.get("cookie") || "").match(/(?:^|;\\s*)hunt_admin_session=([^;]+)/)?.[1] || "";
+  const token = bearer || request.headers.get("x-hunt-admin-session") || (request.headers.get("cookie") || "").match(/(?:^|;\s*)hunt_admin_session=([^;]+)/)?.[1] || "";
 
   if (!token) return null;
   const access = await prisma.adminAccessToken.findUnique({
