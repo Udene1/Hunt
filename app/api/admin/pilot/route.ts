@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
 import { randomInt } from "node:crypto";
-import { hashToken } from "../../../../lib/auth";
+import { getAdminBearer, hashToken } from "../../../../lib/auth";
 import { databaseConfigured, prisma } from "../../../../lib/db";
 
 export const dynamic = "force-dynamic";
 
+export async function GET(request: Request) {
+  if (!await getAdminBearer(request)) return new Response("Unauthorized", { status: 401 });
+  const codes = await prisma.pilotCode.findMany({ orderBy: { createdAt: "desc" }, take: 100, include: { redeemedBy: { select: { email: true } } } });
+  return NextResponse.json({ codes: codes.map((code) => ({ id: code.id, status: code.redeemedAt ? "redeemed" : code.expiresAt && code.expiresAt <= new Date() ? "expired" : "available", createdAt: code.createdAt, expiresAt: code.expiresAt, redeemedAt: code.redeemedAt, redeemedBy: code.redeemedBy, durationDays: code.durationDays })) });
+}
+
 export async function POST(request: Request) {
-  const secret = process.env.HUNT_ADMIN_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
-    return new Response("Unauthorized", { status: 401 });
-  }
+  if (!await getAdminBearer(request)) return new Response("Unauthorized", { status: 401 });
   if (!databaseConfigured()) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
 
   const body = await request.json().catch(() => ({}));
