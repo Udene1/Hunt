@@ -22,10 +22,11 @@ export async function POST(request: Request) {
       if (invite.expiresAt && invite.expiresAt <= now) throw new Error("EXPIRED_CODE");
 
       const pilotExpiresAt = new Date(now.getTime() + invite.durationDays * 86400000);
-      await tx.pilotCode.update({
-        where: { id: invite.id },
+      const claimed = await tx.pilotCode.updateMany({
+        where: { id: invite.id, redeemedAt: null, redeemedByUserId: null },
         data: { redeemedAt: now, redeemedByUserId: user.id },
       });
+      if (claimed.count !== 1) throw new Error("USED_CODE");
       return tx.user.update({
         where: { id: user.id },
         data: { plan: "pilot", pilotExpiresAt },
