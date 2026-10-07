@@ -16,6 +16,7 @@ export default function AdminPage() {
   const [pilots, setPilots] = useState<any[]>([]);
   const [reviews, setReviews] = useState<any[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
+  const [summaryCounts, setSummaryCounts] = useState({ missing: 0, stale: 0 });
   const [durationDays, setDurationDays] = useState("14");
   const [validityDays, setValidityDays] = useState("7");
   const [newCode, setNewCode] = useState("");
@@ -29,10 +30,11 @@ export default function AdminPage() {
     const [p, rv, cs] = await Promise.all([
       fetch("/api/admin/pilot").then(x => x.ok ? x.json() : null),
       fetch("/api/admin/review-tasks?status=open").then(x => x.ok ? x.json() : null),
-      fetch("/api/admin/company-summary?company=").then(x => x.json().catch(() => null)),
+      fetch("/api/admin/summaries").then(x => x.ok ? x.json() : null),
     ]);
     setPilots(p?.codes || []); setReviews(rv?.tasks || []);
-    void cs;
+    setCompanies([...(cs?.missing || []), ...(cs?.stale || [])]);
+    setSummaryCounts(cs?.counts || { missing: 0, stale: 0 });
   }
 
   useEffect(() => { load(); }, []);
@@ -67,6 +69,7 @@ export default function AdminPage() {
     <section style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12}}>
       {Object.entries(m).map(([k,v])=><div key={k} style={{border:"1px solid #ddd",borderRadius:12,padding:16}}><small>{k.replace(/[A-Z]/g," $&")}</small><h2 style={{margin:"8px 0"}}>{v}</h2></div>)}
     </section>
+    <section style={{border:"1px solid #ddd",borderRadius:12,padding:20,marginTop:24}}><h2>Company summaries</h2><p>{summaryCounts.missing} missing · {summaryCounts.stale} stale after new evidence</p>{companies.length===0?<p>All catalogue summaries are current.</p>:companies.slice(0,30).map(c=><div key={c.id} style={{borderTop:"1px solid #eee",padding:"10px 0"}}><b>{c.name}</b> · {c.generalSummary?"needs update":"needs summary"}{c.domain&&" · "+c.domain}<div><small>Evidence: {c.summaryEvidenceAt?new Date(c.summaryEvidenceAt).toLocaleDateString():"—"} · Summary: {c.summaryUpdatedAt?new Date(c.summaryUpdatedAt).toLocaleDateString():"—"}</small></div></div>)}</section>
     <section style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20,marginTop:24}}>
       <div style={{border:"1px solid #ddd",borderRadius:12,padding:20}}><h2>Pilot codes</h2><form onSubmit={createPilot} style={{display:"flex",gap:8,flexWrap:"wrap"}}><input value={durationDays} onChange={e=>setDurationDays(e.target.value)} type="number" min="1" max="90" placeholder="access days"/><input value={validityDays} onChange={e=>setValidityDays(e.target.value)} type="number" min="1" max="30" placeholder="code validity"/><button>Create code</button></form>{newCode&&<p style={{fontFamily:"monospace",fontSize:24}}>New code: <b>{newCode}</b></p>}<p>Available: {m.pilotAvailable} · Redeemed: {m.pilotRedeemed}</p><div>{pilots.map(p=><div key={p.id} style={{padding:"8px 0",borderTop:"1px solid #eee"}}>{p.status} · {p.expiresAt?new Date(p.expiresAt).toLocaleDateString():"no expiry"}{p.redeemedBy?.email&&" · "+p.redeemedBy.email}</div>)}</div></div>
       <div style={{border:"1px solid #ddd",borderRadius:12,padding:20}}><h2>Review queue</h2>{reviews.length===0?<p>No open review tasks.</p>:reviews.map(t=><div key={t.id} style={{borderTop:"1px solid #eee",padding:"10px 0"}}><b>{t.title}</b><p>{t.company?.name||"Unknown"} · {t.detail}</p><button onClick={()=>resolve(t.id)}>Resolve</button></div>)}</div>
