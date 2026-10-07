@@ -51,6 +51,3 @@ The app still works without the database, but explicitly reports that durable pe
 Company → observe → normalize → baseline → detect change → cluster signals → model investigation → opportunity → Cashflow OS
 
 Cashflow OS remains the commercial execution layer. Opportunity Intelligence is the sensing layer.
-
-
-<!-- github-write-test -->
