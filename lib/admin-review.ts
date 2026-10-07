@@ -25,7 +25,7 @@ export async function createAdminReviewTasks(issues: ReviewIssue[]) {
         title: issue.title,
         detail: issue.detail,
         sourceUrl: issue.sourceUrl ?? null,
-        metadata: issue.metadata,
+        metadata: issue.metadata == null ? undefined : JSON.parse(JSON.stringify(issue.metadata)),
         status: "open",
         resolvedAt: null,
         resolvedBy: null,
