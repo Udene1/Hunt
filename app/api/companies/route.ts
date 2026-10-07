@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   const q = new URL(request.url).searchParams.get("q")?.trim().toLowerCase() || "";
   const companies = COMPANY_CATALOG.filter((c) => !q || [c.name, c.domain, c.description, ...c.sectors].join(" ").toLowerCase().includes(q));
 
-  let persisted: Array<{ name: string; domain: string | null; country: string; updatedAt: Date }> = [];
+  let persisted: Array<{ name: string; domain: string | null; country: string; updatedAt: Date; generalSummary: string | null }> = [];
   if (databaseConfigured()) {
     try {
       persisted = await prisma.company.findMany({
