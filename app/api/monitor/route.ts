@@ -7,6 +7,28 @@ import type { SurfaceProbe } from "../../../lib/product-surfaces";
 import { scoreCompanyRelevance } from "../../../lib/relevance";
 import { createAdminReviewTasks, pushAdminReviewAlert } from "../../../lib/admin-review";
 
+type PersistenceResult = {
+  status: "persisted" | "not_configured" | "database_error";
+  newObservationCount: number;
+  unchangedObservationCount: number;
+  changedObservationCount: number;
+  previousObservationCount: number;
+  changedCategories: string[];
+  clusterCategories: string[];
+  baselineCategories: string[];
+  historicalIntersection: string[];
+  crossSignal: boolean;
+  cluster: { id: string; created: boolean } | null;
+  opportunityCount: number;
+  lifecycleEvents: Array<{
+    kind: "removed" | "restored" | "moved";
+    path: string;
+    label: string;
+    status: number | null;
+    missCount: number;
+  }>;
+};
+
 async function persist(
   company: string,
   domain: string | null,
@@ -17,7 +39,7 @@ async function persist(
   contacts: import("../../../lib/company-people-finance").DiscoveredContact[],
   financials: import("../../../lib/company-people-finance").DiscoveredFinancialRecord[],
   reviewIssues: import("../../../lib/financial-document-extractor").FinancialDocumentIssue[] = [],
-) {
+): Promise<PersistenceResult> {
   if (!databaseConfigured()) {
     return {
       status: "not_configured",
@@ -25,6 +47,13 @@ async function persist(
       unchangedObservationCount: 0,
       changedObservationCount: 0,
       previousObservationCount: 0,
+      changedCategories: [],
+      clusterCategories: [],
+      baselineCategories: [],
+      historicalIntersection: [],
+      crossSignal: false,
+      cluster: null,
+      opportunityCount: 0,
       lifecycleEvents: [],
     };
   }
@@ -445,6 +474,11 @@ async function persist(
       previousObservationCount: 0,
       changedCategories: [],
       clusterCategories: [],
+      baselineCategories: [],
+      historicalIntersection: [],
+      crossSignal: false,
+      cluster: null,
+      opportunityCount: 0,
       lifecycleEvents: [],
     };
   }
