@@ -60,7 +60,7 @@ async function persist(
 
   const normalized = normalizeCompany(company);
   try {
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx): Promise<PersistenceResult> => {
       const dbCompany = await tx.company.upsert({
         where: { normalized },
         update: { domain: domain || undefined },
