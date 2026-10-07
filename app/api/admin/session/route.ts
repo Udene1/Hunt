@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
-import { databaseConfigured, hashToken } from "../../../../lib/auth";
+import { hashToken } from "../../../../lib/auth";
+import { databaseConfigured } from "../../../../lib/db";
 import { prisma } from "../../../../lib/db";
 
 export const dynamic = "force-dynamic";
