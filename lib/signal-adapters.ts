@@ -378,11 +378,42 @@ export const SIGNAL_ADAPTERS: SignalAdapter[] = [
   publicSignalAdapter,
 ];
 
+async function verifyObservationEvidence(observations: Observation[]) {
+  const checked = await Promise.all(observations.map(async (observation) => {
+    if (!observation.url) return observation;
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4500);
+      try {
+        const response = await fetch(observation.url, {
+          method: "GET",
+          signal: controller.signal,
+          redirect: "follow",
+          cache: "no-store",
+          headers: {
+            "user-agent": "Opportunity-Intelligence/0.3 evidence-verifier",
+            accept: "text/html,application/json,application/pdf,text/plain,*/*",
+          },
+        });
+        if (!response.ok) return null;
+        return { ...observation, url: response.url };
+      } finally {
+        clearTimeout(timeout);
+      }
+    } catch {
+      return null;
+    }
+  }));
+  return checked.filter((observation): observation is Observation => observation !== null);
+}
+
 export async function collectObservations(company: string, domain: string | null) {
   const results = await Promise.all(SIGNAL_ADAPTERS.map((adapter) => adapter.collect(company, domain)));
+  const rawObservations = results.flatMap((result) => result.observations);
+  const observations = await verifyObservationEvidence(rawObservations);
   return {
     adapters: SIGNAL_ADAPTERS.map((adapter) => adapter.id),
-    observations: results.flatMap((result) => result.observations),
+    observations: Array.from(new Map(observations.map((item) => [item.fingerprint, item])).values()),
     errors: results.flatMap((result) => result.errors),
     probes: results.flatMap((result) => result.probes || []),
     contacts: results.flatMap((result) => result.contacts || []),
