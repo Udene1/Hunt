@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { prisma } from "./db";
 
 const COOKIE = "hunt_session";
+const ADMIN_COOKIE = "hunt_admin_session";
 const SESSION_DAYS = 30;
 
 function hashPassword(password: string) {
@@ -82,8 +83,9 @@ export async function getBearerUser(request: Request) {
 
 export async function getAdminBearer(request: Request) {
   const header = request.headers.get("authorization") || "";
-  if (!header.startsWith("Bearer ")) return null;
-  const token = header.slice(7).trim();
+  const bearer = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+  const token = bearer || request.headers.get("x-hunt-admin-session") || (request.headers.get("cookie") || "").match(/(?:^|;\\s*)hunt_admin_session=([^;]+)/)?.[1] || "";
+
   if (!token) return null;
   const access = await prisma.adminAccessToken.findUnique({
     where: { tokenHash: hashToken(token) },
