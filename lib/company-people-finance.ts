@@ -94,7 +94,7 @@ export async function collectCompanyPeopleAndFinance(company: string, domain: st
   if (!domain) return { contacts: [], financials: [], observations, errors };
 
   const root = "https://" + domain;
-  const pages = new Set([root, ...contactPaths.map((path) => root + path)]);
+  const pages = [root, ...contactPaths.map((path) => root + path)];
 
   for (const url of pages) {
     const controller = new AbortController();
