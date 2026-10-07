@@ -20,5 +20,7 @@ export async function POST(request: Request) {
     include: { profile: true },
   });
   await createUserSession(user.id);
+  await prisma.auditEvent.create({ data: { userId: user.id, action: "register", resource: "auth", metadata: { country: request.headers.get("x-vercel-ip-country"), region: request.headers.get("x-vercel-ip-country-region"), city: request.headers.get("x-vercel-ip-city") } } }).catch(() => {});
+
   return NextResponse.json({ user: { id: user.id, email: user.email, plan: user.plan }, profile: user.profile }, { status: 201 });
 }
