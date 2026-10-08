@@ -41,7 +41,8 @@ export const publicEvidenceDiscoveryAdapter: SignalAdapter = {
         const response = await fetch(searchUrl, { signal: controller.signal, cache:"no-store", headers:{ "user-agent":"Opportunity-Intelligence/0.5 evidence-discovery" } });
         if (!response.ok) throw new Error();
         const html = (await response.text()).slice(0, 900000);
-        const results = Array.from(html.matchAll(/result__a[^>]*href=["\']([^"\']+)["\'][^>]*>([\s\S]*?)<\/a>/gi));
+        const resultPattern = new RegExp("result__a[^>]*href=[\\\"']([^\\\"']+)[\\\"'][^>]*>([\\\\s\\\\S]*?)<\\\\/a>", "gi");
+        const results = Array.from(html.matchAll(resultPattern));
         for (const match of results.slice(0, 6)) {
           const href = absolute("https://html.duckduckgo.com", match[1]); if (!href || blocked(href)) continue;
           const title = clean(match[2]).slice(0, 220); if (!title) continue;
