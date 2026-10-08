@@ -230,7 +230,7 @@ async function persist(
             data: {
               sourceTier, verificationStatus, entityConfidence, evidenceConfidence,
               lastSeenAt: new Date(),
-              observedAt: new Date(observation.observedAt),
+              observedAt: classificationChanged ? new Date(observation.observedAt) : existing.observedAt,
               runId: run.id,
               source: observation.source,
               type: observation.type,
