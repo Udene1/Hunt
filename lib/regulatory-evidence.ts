@@ -41,7 +41,7 @@ export const authoritativeRegulatoryEvidenceAdapter: SignalAdapter = {
         const response = await fetch(searchUrl, { signal:controller.signal, cache:"no-store", headers:{ "user-agent":"Opportunity-Intelligence/0.5 regulatory-evidence" } });
         if (!response.ok) throw new Error();
         const html = (await response.text()).slice(0, 900000);
-        const resultPattern = new RegExp("result__a[^>]*href=[\\\"']([^\\\"']+)[\\\"'][^>]*>([\\\\s\\\\S]*?)<\\\\/a>", "gi");
+        const resultPattern = new RegExp("result__a[^>]*href=[\\\"']([^\\\"']+)[\\\"'][^>]*>([\\\\s\\\\S]*?)</a>", "gi");
         const results = Array.from(html.matchAll(resultPattern));
         for (const match of results.slice(0, 5)) {
           const href = absolute("https://html.duckduckgo.com", match[1]); if (!href) continue;
