@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma, databaseConfigured } from "../../../lib/db";
 import { findCompany, normalizeCompany } from "../../../lib/companies";
 import { discoverCompanyDomain } from "../../../lib/company-discovery";
@@ -217,7 +218,7 @@ async function persist(
                 url: existing.url,
                 fingerprint: existing.fingerprint,
                 observedAt: existing.observedAt,
-                metadata: existing.metadata,
+                metadata: existing.metadata ?? Prisma.JsonNull,
                 sourceTier: existing.sourceTier,
                 verificationStatus: existing.verificationStatus,
                 entityConfidence: existing.entityConfidence,
