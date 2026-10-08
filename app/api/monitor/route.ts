@@ -175,11 +175,23 @@ async function persist(
         });
         if (existing) {
           const priorStatus = existing.status;
+          const existingMetadata = existing.metadata && typeof existing.metadata === "object" && !Array.isArray(existing.metadata)
+            ? existing.metadata as Record<string, unknown>
+            : {};
+          const nextMetadata = observation.metadata && typeof observation.metadata === "object"
+            ? observation.metadata as Record<string, unknown>
+            : {};
+          const contentChanged = Boolean(
+            existingMetadata.contentHash &&
+            nextMetadata.contentHash &&
+            existingMetadata.contentHash !== nextMetadata.contentHash
+          );
           const classificationChanged =
             existing.category !== observation.category ||
             existing.title !== observation.title ||
             existing.source !== observation.source ||
-            existing.url !== observation.url;
+            existing.url !== observation.url ||
+            contentChanged;
 
           if (classificationChanged) {
             changedObservationCount++;
