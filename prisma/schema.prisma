@@ -74,6 +74,10 @@ model Observation {
   lastSeenAt  DateTime       @default(now())
   metadata           Json?
   status             String   @default("active")
+  sourceTier         String   @default("secondary")
+  verificationStatus String   @default("unverified")
+  entityConfidence   Int      @default(50)
+  evidenceConfidence Int      @default(50)
   missCount          Int      @default(0)
   lastProbeAt        DateTime?
   missingSince       DateTime?
@@ -213,6 +217,8 @@ model SignalCluster {
   detail       String
   categories   Json
   evidenceIds  Json
+  windowStart  DateTime @default(now())
+  windowEnd    DateTime @default(now())
   firstSeenAt  DateTime @default(now())
   lastSeenAt   DateTime @default(now())
   company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -235,6 +241,8 @@ model OpportunityCandidate {
   evidenceIds Json
   status      String   @default("new")
   investigationState String @default("not_investigated")
+  investigationNotes String?
+  investigatedAt DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
