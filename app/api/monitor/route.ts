@@ -356,7 +356,7 @@ async function persist(
             score: Math.min(99, signal.score + clusterStrength * 4),
             headline: crossSignal ? "Cross-signal evidence detected" : signal.headline,
             detail: crossSignal
-              ? signal.detail + " New evidence intersects " + historicalIntersection.length + " established signal categor" + (historicalIntersection.length === 1 ? "y." : "ies.") + " Review the underlying evidence; Hunt does not determine the commercial conclusion."
+              ? signal.detail + " New changed evidence spans " + changedSourceFamilies.length + " source families and intersects " + historicalIntersection.length + " established categor" + (historicalIntersection.length === 1 ? "y." : "ies.") + " Review the underlying evidence; Hunt does not determine the commercial conclusion."
               : signal.detail + " Review the underlying evidence before drawing a conclusion.",
             commercialInterpretation: "Investigation input only: inspect the underlying evidence, changes, source independence and uncertainty before drawing a commercial conclusion.",
           },
