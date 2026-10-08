@@ -112,6 +112,12 @@ export default function AccountPage() {
     setStatus("MCP token created. Copy it now; Hunt will not display the secret again.");
   }
 
+  async function updateInvestigation(id: string, state: string) {
+    const r = await fetch("/api/opportunities/" + encodeURIComponent(id), { method:"PATCH", headers:{"content-type":"application/json"}, body:JSON.stringify({ investigationState:state }) });
+    const data = await r.json().catch(()=>({}));
+    if (r.ok) setOpportunities((items)=>items.map((item)=>item.id===id?data.opportunity:item));
+  }
+
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
@@ -157,7 +163,7 @@ export default function AccountPage() {
             <h2>{opportunities.length} candidates · {notifications.filter((n) => !n.readAt).length} unread</h2>
             <p>These are deterministic evidence matches, not sales decisions. Open the evidence or ask your connected AI to investigate.</p>
             {opportunities.slice(0, 8).map((o) => (
-              <div className="observation" key={o.id}><span>{o.score}</span><div><b>{o.company?.name}</b><small>{o.reason}</small></div><Link href={"/?company=" + encodeURIComponent(o.company?.name || "")}>Evidence ↗</Link></div>
+              <div className="observation" key={o.id}><span>{o.score}</span><div><b>{o.company?.name}</b><small>{o.reason} · investigation: {o.investigationState}</small><div style={{marginTop:6,display:"flex",gap:6,flexWrap:"wrap"}}>{["investigating","qualified","rejected","actionable"].map((state)=><button type="button" className="refresh" key={state} onClick={()=>updateInvestigation(o.id,state)}>{state}</button>)}</div></div><Link href={"/?company=" + encodeURIComponent(o.company?.name || "")}>Evidence ↗</Link></div>
             ))}
             {!opportunities.length && <div className="empty">No opportunity candidates yet. Watch companies and let monitoring establish intersections.</div>}
           </div>
