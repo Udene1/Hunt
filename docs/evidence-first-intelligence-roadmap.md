@@ -71,7 +71,7 @@ Build adapters as evidence collectors, not conclusion generators:
 
 - [x] Opportunity investigation state.
 - [x] Investigation notes.
-- [ ] Evidence bundle endpoint designed for external AI.
+- [ ] Evidence bundle endpoint designed for external AI.\n- [x] Company UI exposes evidence activity, source family, change state and bounded context.
 - [ ] Claim/evidence linkage.
 - [ ] Contradiction and missing-evidence reporting.
 - [ ] External-AI investigation protocol.
