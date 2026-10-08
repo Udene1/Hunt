@@ -19,7 +19,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ company, persistent: true, runs: [], observations: [], signals: [] });
     }
 
-    const [runs, observations, signals, clusters] = await Promise.all([
+    const [runs, observations, revisions, signals, clusters] = await Promise.all([
       prisma.monitoringRun.findMany({
         where: { companyId: dbCompany.id },
         orderBy: { startedAt: "desc" },
@@ -60,6 +60,17 @@ export async function GET(request: Request) {
           evidenceConfidence: true,
         },
       }),
+      prisma.observationRevision.findMany({
+        where: { observation: { companyId: dbCompany.id } },
+        orderBy: { capturedAt: "desc" },
+        take: 100,
+        select: {
+          id: true, observationId: true, runId: true, source: true, type: true,
+          category: true, title: true, url: true, fingerprint: true, observedAt: true,
+          capturedAt: true, metadata: true, sourceTier: true, verificationStatus: true,
+          entityConfidence: true, evidenceConfidence: true,
+        },
+      }),
       prisma.signal.findMany({
         where: { companyId: dbCompany.id },
         orderBy: { createdAt: "desc" },
@@ -85,6 +96,7 @@ export async function GET(request: Request) {
       signalCount: signals.length,
       runs,
       observations,
+      revisions,
       signals,
       clusters,
     });
