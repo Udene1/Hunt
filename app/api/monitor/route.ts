@@ -386,7 +386,7 @@ async function persist(
           : {};
         return metadata.changeKind === "new" || metadata.changeKind === "changed";
       });
-      const correlation = correlateEvidence(changedEvidence.length >= 2 ? changedEvidence : recentEvidence);
+      const correlation = correlateEvidence(changedEvidence);
 
       if (correlation && hasHistoricalBaseline) {
         const clusterScore = correlation.score;
