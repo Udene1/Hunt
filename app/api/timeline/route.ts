@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     prisma.signal.findMany({ where: { companyId: company.id }, orderBy: { createdAt: "desc" }, take: 50 }),
   ]);
   const events = [
-    ...observations.map(o => ({ at:o.observedAt, kind:"evidence", category:o.category, title:o.title, source:o.source, url:o.url, status:o.status, confidence:o.evidenceConfidence, entityConfidence:o.entityConfidence })),
+    ...observations.map(o => ({ at:o.observedAt, kind:"evidence", category:o.category, title:o.title, source:o.source, url:o.url, status:o.status, confidence:o.evidenceConfidence, entityConfidence:o.entityConfidence, sourceTier:o.sourceTier, detail: (() => { const m=o.metadata && typeof o.metadata==="object" && !Array.isArray(o.metadata) ? o.metadata as Record<string, unknown> : {}; return typeof m.context === "string" ? m.context : typeof m.excerpt === "string" ? m.excerpt : undefined; })() })),
     ...clusters.map(c => ({ at:c.lastSeenAt, kind:"cluster", category:(c.categories as string[]).join(" + "), title:c.headline, source:"Hunt signal cluster", url:null, status:"active", confidence:80, entityConfidence:90, score:c.score, windowStart:c.windowStart, windowEnd:c.windowEnd })),
     ...signals.map(s => ({ at:s.createdAt, kind:"signal", category:"Commercial signal", title:s.headline, source:"Hunt", url:null, status:"active", confidence:70, entityConfidence:100, score:s.score, detail:s.commercialInterpretation })),
   ].sort((a,b)=>new Date(b.at).getTime()-new Date(a.at).getTime());
