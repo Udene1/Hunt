@@ -40,6 +40,7 @@ export default function Home() {
   const [monitor, setMonitor] = useState<Record<string, Monitor>>({});
   const [history, setHistory] = useState<Record<string, History>>({});
   const [profiles, setProfiles] = useState<Record<string, CompanyProfile>>({});
+  const [timelines, setTimelines] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState<string | null>(null);
   const [watchPersistent, setWatchPersistent] = useState(false);
@@ -106,6 +107,9 @@ export default function Home() {
       const r = await fetch("/api/history?company=" + encodeURIComponent(company), { cache: "no-store" });
       const data = await r.json();
       if (r.ok) setHistory((h) => ({ ...h, [company]: data }));
+      const timelineResponse = await fetch("/api/timeline?company=" + encodeURIComponent(company), { cache: "no-store" });
+      const timelineData = await timelineResponse.json().catch(() => ({}));
+      if (timelineResponse.ok) setTimelines((t) => ({ ...t, [company]: timelineData.timeline || [] }));
       await loadProfile(company);
     } finally { setHistoryLoading(null); }
   }
@@ -275,9 +279,19 @@ export default function Home() {
                   ) : null}
 
                   <div className="sectionHead" style={{ marginTop: 24 }}>
-                    <h2>Observation timeline</h2><span>{history[active].observations.length} STORED</span>
+                    <h2>Company timeline</h2><span>{timelines[active]?.length || 0} EVENTS</span>
                   </div>
-                  {history[active].observations.map((o) => (
+                  {(timelines[active] || []).slice(0, 40).map((o: any, i: number) => (
+                    <div className="observation" key={String(o.at)+String(o.title)+i}>
+                      <span>{o.kind === "cluster" ? "CLUSTER" : o.kind === "signal" ? "SIGNAL" : o.status === "confirmed_removed" ? "REMOVED" : o.source}</span>
+                      <div><b>{o.title}</b><small>{o.category} · {new Date(o.at).toLocaleString()} · evidence confidence {o.confidence ?? "—"}%{o.entityConfidence != null ? " · entity confidence " + o.entityConfidence + "%" : ""}</small>{o.detail && <small>{o.detail}</small>}</div>
+                      {o.url && <a href={o.url} target="_blank" rel="noreferrer">Evidence ↗</a>}
+                    </div>
+                  ))}
+                  <div className="sectionHead" style={{ marginTop: 24 }}>
+                    <h2>Raw evidence history</h2><span>{history[active].observations.length} STORED</span>
+                  </div>
+                  {history[active].observations.slice(0, 40).map((o) => (
                     <div className="observation" key={o.id}>
                       <span>{o.status === "confirmed_removed" ? "REMOVED" : o.status === "suspected_missing" ? "CHECKING" : o.source}</span>
                       <div><b>{o.title}</b><small>{o.category} · first seen {new Date(o.firstSeenAt).toLocaleDateString()} · last seen {new Date(o.lastSeenAt).toLocaleDateString()}{o.status === "confirmed_removed" && o.confirmedRemovedAt ? " · removed " + new Date(o.confirmedRemovedAt).toLocaleDateString() : ""}{o.status === "suspected_missing" ? " · miss " + (o.missCount || 1) + "/2" : ""}</small></div>
