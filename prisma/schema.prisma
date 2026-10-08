@@ -84,8 +84,32 @@ model Observation {
   confirmedRemovedAt DateTime?
   company            Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   run         MonitoringRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+  revisions   ObservationRevision[]
   @@unique([companyId, fingerprint])
   @@index([companyId, observedAt])
+  @@schema("hunt")
+}
+
+model ObservationRevision {
+  id            String      @id @default(cuid())
+  observationId String
+  runId         String?
+  source        String
+  type          String
+  category      String
+  title         String
+  url           String?
+  fingerprint   String
+  observedAt    DateTime
+  capturedAt    DateTime    @default(now())
+  metadata      Json?
+  sourceTier    String      @default("secondary")
+  verificationStatus String @default("unverified")
+  entityConfidence Int      @default(50)
+  evidenceConfidence Int    @default(50)
+  observation   Observation @relation(fields: [observationId], references: [id], onDelete: Cascade)
+  run           MonitoringRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+  @@index([observationId, capturedAt])
   @@schema("hunt")
 }
 
