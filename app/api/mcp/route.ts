@@ -292,7 +292,10 @@ async function authorized(request: Request) {
   if (!user) {
     return new Response(JSON.stringify({ error: "Bearer authentication required." }), {
       status: 401,
-      headers: { "content-type": "application/json", "www-authenticate": 'Bearer realm="Hunt MCP"' },
+      headers: {
+        "content-type": "application/json",
+        "www-authenticate": 'Bearer realm="Hunt MCP", error="invalid_token"',
+      },
     });
   }
   if (!monitoringEntitled(user)) {
