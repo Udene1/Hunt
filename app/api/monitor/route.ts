@@ -204,12 +204,7 @@ async function persist(
               category: observation.category,
               title: observation.title,
               url: observation.url,
-              metadata: observation.metadata,
-              sourceTier,
-              verificationStatus,
-              entityConfidence,
-              evidenceConfidence,
-              status: "active",
+              metadata: observation.metadata, status: "active",
               missCount: 0,
               lastProbeAt: observation.source === "Official public surface" ? new Date() : existing.lastProbeAt,
               missingSince: observation.source === "Official public surface" ? null : existing.missingSince,
@@ -325,11 +320,11 @@ async function persist(
             companyId: dbCompany.id,
             runId: run.id,
             score: Math.min(99, signal.score + clusterStrength * 4),
-            headline: crossSignal ? "Cross-signal activity detected" : signal.headline,
+            headline: crossSignal ? "Cross-signal evidence detected" : signal.headline,
             detail: crossSignal
-              ? signal.detail + " New evidence intersects " + historicalIntersection.length + " established signal categor" + (historicalIntersection.length === 1 ? "y." : "ies.")
-              : signal.detail,
-            commercialInterpretation: signal.commercialInterpretation,
+              ? signal.detail + " New evidence intersects " + historicalIntersection.length + " established signal categor" + (historicalIntersection.length === 1 ? "y." : "ies.") + " Review the underlying evidence; Hunt does not determine the commercial conclusion."
+              : signal.detail + " Review the underlying evidence before drawing a conclusion.",
+            commercialInterpretation: "Investigation required: Hunt provides public evidence and observed change, not a hardcoded commercial finding.",
           },
         });
       }
@@ -555,29 +550,7 @@ export async function GET(request: Request) {
         score: Math.min(98, 52 + Math.min(jobCount, 8) * 4 + Math.min(websiteCount, 1) * 7 + Math.min(procurementCount, 4) * 6 + Math.min(technologyCount, 6) * 4 + Math.min(productSurfaceCount, 4) * 5 + Math.min(githubCount, 6) * 3 + Math.min(githubVelocityCount, 3) * 4 + Math.max(categories.length - 1, 0) * 5),
         headline: categories.length > 1 ? "Multi-signal activity detected" : categories[0] + " activity",
         detail: unique.length + " public observation" + (unique.length === 1 ? "" : "s") + " collected across " + (categories.length > 1 ? categories.length + " signal categories." : "the available signal source."),
-        commercialInterpretation: categories.includes("Engineering / infrastructure")
-          ? "Potential engineering, infrastructure or delivery capacity demand"
-          : categories.includes("Security / compliance")
-            ? "Potential security, compliance or reliability demand"
-            : categories.includes("Commercial")
-              ? "Potential revenue, partnership or go-to-market demand"
-              : categories.includes("Product / operations")
-                ? "Potential product, implementation or operational demand"
-                : categories.includes("Procurement")
-                  ? "Potential supplier, implementation, procurement or contract demand"
-                  : categories.includes("Technology / infrastructure")
-                    ? "Potential platform, infrastructure, API, integration or technical delivery demand"
-                    : categories.includes("Product / API surface")
-                      ? "Potential API, integration, developer-platform or technical delivery demand"
-                    : categories.includes("Product / release")
-                      ? "Potential product release, integration or technical delivery demand"
-                    : categories.includes("Engineering / GitHub velocity")
-                      ? "Potential engineering, platform or developer-ecosystem demand; investigate whether engineering activity is accelerating"
-                    : categories.includes("Engineering / GitHub activity")
-                      ? "Potential engineering, platform or developer-ecosystem demand"
-                    : categories.includes("Website / product")
-                      ? "Website evidence captured; persistence will determine whether a product change occurred"
-                      : "Potential commercial or operational demand",
+        commercialInterpretation: "Investigation required: Hunt records public evidence and observed change. It does not infer a commercial need from signal category alone.",
       }
     : null;
 
