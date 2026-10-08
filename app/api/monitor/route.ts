@@ -409,7 +409,7 @@ async function persist(
           },
         });
         clusterId = cluster.id;
-        clusterCreated = cluster.createdAt.getTime() >= run.startedAt.getTime() - 1000;
+        clusterCreated = cluster.firstSeenAt.getTime() >= run.startedAt.getTime() - 1000;
         const clusterEvidence = recentEvidence.filter((item) => correlation.evidenceIds.includes(item.id));
         const clusterFingerprint = correlation.fingerprint;
         const watchedUsers = await tx.user.findMany({
