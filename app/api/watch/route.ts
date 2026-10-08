@@ -16,7 +16,7 @@ export async function GET() {
       include: { company: true },
       orderBy: { createdAt: "desc" },
     });
-    return NextResponse.json({ companies: watches.map((w) => w.company), persistent: true });
+    return NextResponse.json({ companies: watches.map((w) => w.company), watches: watches.map((w) => ({ companyId:w.companyId, company:w.company.name, signalTypes:w.signalTypes, minScore:w.minScore })), persistent: true });
   } catch {
     return NextResponse.json({ companies: [], persistent: false, error: "database unavailable" }, { status: 503 });
   }
@@ -70,4 +70,24 @@ export async function DELETE(request: Request) {
   } catch {
     return NextResponse.json({ error: "database unavailable" }, { status: 503 });
   }
+}
+
+
+export async function PATCH(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error:"Authentication required.", code:"authentication_required" }, {status:401});
+  if (!monitoringEntitled(user)) return NextResponse.json({ error:"Watching companies requires a pilot or paid account.", code:"plan_required" }, {status:402});
+  if (!databaseConfigured()) return NextResponse.json({error:"Database unavailable"},{status:503});
+  const body=await request.json().catch(()=>({}));
+  const raw=String(body.company||"").trim();
+  if(!raw) return NextResponse.json({error:"company is required"},{status:400});
+  const seed=findCompany(raw);
+  const company=await prisma.company.findUnique({where:{normalized:normalizeCompany(seed?.name||raw)}});
+  if(!company) return NextResponse.json({error:"Company is not being watched."},{status:404});
+  const watch=await prisma.userWatch.findUnique({where:{userId_companyId:{userId:user.id,companyId:company.id}}});
+  if(!watch) return NextResponse.json({error:"Company is not being watched."},{status:404});
+  const signalTypes=Array.isArray(body.signalTypes)?body.signalTypes.filter((x:any)=>typeof x==="string").slice(0,20):null;
+  const minScore=Math.max(20,Math.min(99,Number(body.minScore||20)));
+  const updated=await prisma.userWatch.update({where:{id:watch.id},data:{signalTypes:signalTypes==null?watch.signalTypes:signalTypes,minScore}});
+  return NextResponse.json({watch:updated});
 }
