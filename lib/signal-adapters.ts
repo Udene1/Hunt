@@ -180,8 +180,14 @@ const websiteAdapter: SignalAdapter = {
           category: "Website / product",
           url: "https://" + domain,
           observedAt: new Date().toISOString(),
-          fingerprint: await sha256("website|" + domain + "|" + normalized),
-          metadata: { domain, status: response.status, contentLength: normalized.length },
+          fingerprint: await sha256("website|" + domain),
+          metadata: {
+            domain,
+            status: response.status,
+            contentLength: normalized.length,
+            contentHash: await sha256(normalized),
+            evidenceType: "official_web_snapshot",
+          },
         }],
         errors: [],
       };
