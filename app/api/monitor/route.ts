@@ -204,6 +204,26 @@ async function persist(
           const verificationStatus = observation.url ? "reachable" : "unverified";
           const entityConfidence = observation.source === "Official website" || observation.source === "GitHub" ? 90 : 70;
           const evidenceConfidence = sourceTier === "authoritative" ? 95 : sourceTier === "first_party" ? 85 : 65;
+          if (classificationChanged) {
+            await tx.observationRevision.create({
+              data: {
+                observationId: existing.id,
+                runId: existing.runId,
+                source: existing.source,
+                type: existing.type,
+                category: existing.category,
+                title: existing.title,
+                url: existing.url,
+                fingerprint: existing.fingerprint,
+                observedAt: existing.observedAt,
+                metadata: existing.metadata,
+                sourceTier: existing.sourceTier,
+                verificationStatus: existing.verificationStatus,
+                entityConfidence: existing.entityConfidence,
+                evidenceConfidence: existing.evidenceConfidence,
+              },
+            });
+          }
           await tx.observation.update({
             where: { id: existing.id },
             data: {
