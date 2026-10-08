@@ -342,9 +342,10 @@ async function persist(
       const historicalIntersection = currentCategories.filter((category) => baselineCategories.includes(category));
       const clusterCategories = Array.from(new Set([...currentCategories, ...historicalIntersection]));
       const hasHistoricalBaseline = previousObservationCount > 0;
-      const crossSignal = hasHistoricalBaseline && (
-        currentCategories.length >= 2 || historicalIntersection.length > 0
-      );
+      const changedSourceFamilies = Array.from(new Set(
+        changedObservations.map((observation) => sourceFamily(observation.source, observation.url)),
+      ));
+      const crossSignal = hasHistoricalBaseline && currentCategories.length >= 2 && changedSourceFamilies.length >= 2;
       const clusterStrength = crossSignal ? Math.min(3, currentCategories.length) + 1 : 0;
 
       if (signal && (newObservationCount > 0 || changedObservationCount > 0)) {
