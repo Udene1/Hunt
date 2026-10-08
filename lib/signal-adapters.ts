@@ -3,10 +3,12 @@ import { githubAdapter } from "./github-signals";
 import { collectCompanyPeopleAndFinance, type DiscoveredContact, type DiscoveredFinancialRecord } from "./company-people-finance";
 import { publicSignalAdapter } from "./public-signal-adapter";
 import type { FinancialDocumentIssue } from "./financial-document-extractor";
+import { publicEvidenceDiscoveryAdapter } from "./public-evidence-discovery";
+import { authoritativeRegulatoryEvidenceAdapter } from "./regulatory-evidence";
 
 export type Observation = {
   source: string;
-  type: "job" | "website" | "product" | "technology" | "security" | "funding" | "leadership" | "regulatory" | "procurement" | "partnership" | "location";
+  type: "job" | "website" | "product" | "technology" | "security" | "funding" | "leadership" | "regulatory" | "procurement" | "partnership" | "location" | "business" | "insurance" | "legal" | "financial";
   title: string;
   category: string;
   url: string | null;
@@ -434,6 +436,8 @@ export const SIGNAL_ADAPTERS: SignalAdapter[] = [
   peopleFinanceAdapter,
   publicSignalAdapter,
   regulatoryAdapter,
+  authoritativeRegulatoryEvidenceAdapter,
+  publicEvidenceDiscoveryAdapter,
 ];
 
 async function verifyObservationEvidence(observations: Observation[]) {
