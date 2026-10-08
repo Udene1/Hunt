@@ -279,7 +279,7 @@ export default function Home() {
                   ) : null}
 
                   <div className="sectionHead" style={{ marginTop: 24 }}>
-                    <h2>Company timeline</h2><span>{timelines[active]?.length || 0} EVENTS</span>
+                    <h2>What changed</h2><span>{timelines[active]?.length || 0} EVENTS</span>
                   </div>
                   {(timelines[active] || []).slice(0, 40).map((o: any, i: number) => (
                     <div className="observation" key={String(o.at)+String(o.title)+i}>
@@ -289,7 +289,7 @@ export default function Home() {
                     </div>
                   ))}
                   <div className="sectionHead" style={{ marginTop: 24 }}>
-                    <h2>Raw evidence history</h2><span>{history[active].observations.length} STORED</span>
+                    <h2>Evidence archive</h2><span>{history[active].observations.length} STORED</span>
                   </div>
                   {history[active].observations.slice(0, 40).map((o) => (
                     <div className="observation" key={o.id}>
@@ -330,7 +330,7 @@ export default function Home() {
           <div className="panel dark">
             <p className="eyebrow">PRODUCT RULE</p>
             <h2>AI is the investigator.<br />Evidence is the product.</h2>
-            <p>Jobs are only one adapter. The engine is being built to detect website, product, technology, security, funding, procurement and other public changes.</p>
+            <p>Jobs are only one adapter. Hunt watches business, financial, insurance, regulatory, procurement, relationship, expansion, technology, security and other public evidence.</p>
           </div>
         </aside>
       </section>
