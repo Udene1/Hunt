@@ -7,6 +7,7 @@ import { requireMonitoringAccess } from "../../../lib/entitlements";
 import type { SurfaceProbe } from "../../../lib/product-surfaces";
 import { scoreCompanyRelevance } from "../../../lib/relevance";
 import { createAdminReviewTasks, pushAdminReviewAlert } from "../../../lib/admin-review";
+import { correlateEvidence } from "../../../lib/evidence-correlation";
 
 type PersistenceResult = {
   status: "persisted" | "not_configured" | "database_error";
@@ -236,7 +237,7 @@ async function persist(
               category: observation.category,
               title: observation.title,
               url: observation.url,
-              metadata: observation.metadata, status: "active",
+              metadata: observation.metadata ? { ...observation.metadata, changeKind: classificationChanged ? "changed" : "unchanged" } : { changeKind: classificationChanged ? "changed" : "unchanged" }, status: "active",
               missCount: 0,
               lastProbeAt: observation.source === "Official public surface" ? new Date() : existing.lastProbeAt,
               missingSince: observation.source === "Official public surface" ? null : existing.missingSince,
@@ -356,7 +357,7 @@ async function persist(
             detail: crossSignal
               ? signal.detail + " New evidence intersects " + historicalIntersection.length + " established signal categor" + (historicalIntersection.length === 1 ? "y." : "ies.") + " Review the underlying evidence; Hunt does not determine the commercial conclusion."
               : signal.detail + " Review the underlying evidence before drawing a conclusion.",
-            commercialInterpretation: "Investigation required: Hunt provides public evidence and observed change, not a hardcoded commercial finding.",
+            commercialInterpretation: "Investigation input only: inspect the underlying evidence, changes, source independence and uncertainty before drawing a commercial conclusion.",
           },
         });
       }
@@ -364,28 +365,49 @@ async function persist(
       let clusterCreated = false;
       let clusterId: string | null = null;
       let opportunityCount = 0;
-      const clusterEvidence = await tx.observation.findMany({
-        where: { runId: run.id },
-        select: { id: true, title: true, category: true, source: true, url: true, observedAt: true, metadata: true },
+      const recentEvidence = await tx.observation.findMany({
+        where: {
+          companyId: dbCompany.id,
+          observedAt: { gte: new Date(Date.now() - 14 * 86400000) },
+          status: { not: "confirmed_removed" },
+        },
+        select: {
+          id: true, title: true, category: true, source: true, type: true, url: true,
+          observedAt: true, metadata: true, sourceTier: true, verificationStatus: true,
+          evidenceConfidence: true,
+        },
         orderBy: { observedAt: "desc" },
+        take: 120,
       });
-      const clusterCategorySet = Array.from(new Set(clusterEvidence.map((item) => item.category)));
-      const clusterEvidenceIds = clusterEvidence.map((item) => item.id);
-      if (hasHistoricalBaseline && clusterCategorySet.length >= 2 && clusterEvidenceIds.length >= 2) {
-        const clusterFingerprint = clusterCategorySet.slice().sort().join("|").toLowerCase();
-        const windowStart = new Date(Date.now() - 14 * 86400000);
-        const windowEnd = new Date();
-        const clusterScore = Math.min(99, 60 + Math.min(clusterCategorySet.length, 5) * 6 + Math.min(changedObservationCount, 5) * 2);
-        const clusterHeadline = clusterCategorySet.slice(0, 3).join(" + ") + " intersection";
-        const clusterDetail = clusterEvidence.length + " current observations intersect across " + clusterCategorySet.length + " signal categories. Hunt stores the evidence; an external AI should investigate whether the intersection represents a commercial opportunity.";
+      const changedEvidence = recentEvidence.filter((item) => {
+        const metadata = item.metadata && typeof item.metadata === "object" && !Array.isArray(item.metadata)
+          ? item.metadata as Record<string, unknown>
+          : {};
+        return metadata.changeKind === "new" || metadata.changeKind === "changed";
+      });
+      const correlation = correlateEvidence(changedEvidence.length >= 2 ? changedEvidence : recentEvidence);
+
+      if (correlation && hasHistoricalBaseline) {
+        const clusterScore = correlation.score;
+        const clusterCategorySet = correlation.categories;
+        const clusterEvidenceIds = correlation.evidenceIds;
+        const clusterHeadline = correlation.headline;
+        const clusterDetail = correlation.detail + " Hunt stores the evidence; an external investigator decides what it means commercially.";
         const cluster = await tx.signalCluster.upsert({
-          where: { companyId_fingerprint: { companyId: dbCompany.id, fingerprint: clusterFingerprint } },
-          update: { runId: run.id, score: clusterScore, headline: clusterHeadline, detail: clusterDetail, categories: clusterCategorySet, evidenceIds: clusterEvidenceIds, windowStart, windowEnd, lastSeenAt: new Date() },
-          create: { companyId: dbCompany.id, runId: run.id, fingerprint: clusterFingerprint, score: clusterScore, headline: clusterHeadline, detail: clusterDetail, categories: clusterCategorySet, evidenceIds: clusterEvidenceIds, windowStart, windowEnd },
+          where: { companyId_fingerprint: { companyId: dbCompany.id, fingerprint: correlation.fingerprint } },
+          update: {
+            runId: run.id, score: clusterScore, headline: clusterHeadline, detail: clusterDetail,
+            categories: clusterCategorySet, evidenceIds: clusterEvidenceIds,
+            windowStart: correlation.windowStart, windowEnd: correlation.windowEnd, lastSeenAt: new Date(),
+          },
+          create: {
+            companyId: dbCompany.id, runId: run.id, fingerprint: correlation.fingerprint, score: clusterScore,
+            headline: clusterHeadline, detail: clusterDetail, categories: clusterCategorySet,
+            evidenceIds: clusterEvidenceIds, windowStart: correlation.windowStart, windowEnd: correlation.windowEnd,
+          },
         });
         clusterId = cluster.id;
-        clusterCreated = true;
-
+        clusterCreated = cluster.createdAt.getTime() >= run.startedAt.getTime() - 1000;
         const watchedUsers = await tx.user.findMany({
           where: { userWatches: { some: { companyId: dbCompany.id } } },
           include: { profile: true },
