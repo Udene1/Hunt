@@ -19,7 +19,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ company, persistent: true, runs: [], observations: [], signals: [] });
     }
 
-    const [runs, observations, signals] = await Promise.all([
+    const [runs, observations, signals, clusters] = await Promise.all([
       prisma.monitoringRun.findMany({
         where: { companyId: dbCompany.id },
         orderBy: { startedAt: "desc" },
@@ -54,6 +54,10 @@ export async function GET(request: Request) {
           lastProbeAt: true,
           missingSince: true,
           confirmedRemovedAt: true,
+          sourceTier: true,
+          verificationStatus: true,
+          entityConfidence: true,
+          evidenceConfidence: true,
         },
       }),
       prisma.signal.findMany({
@@ -70,6 +74,7 @@ export async function GET(request: Request) {
           runId: true,
         },
       }),
+      prisma.signalCluster.findMany({ where: { companyId: dbCompany.id }, orderBy: { lastSeenAt: "desc" }, take: 30 }),
     ]);
 
     return NextResponse.json({
@@ -81,6 +86,7 @@ export async function GET(request: Request) {
       runs,
       observations,
       signals,
+      clusters,
     });
   } catch {
     return NextResponse.json({ company, persistent: false, error: "database unavailable" }, { status: 503 });
