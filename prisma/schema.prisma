@@ -54,6 +54,7 @@ model MonitoringRun {
   errorCount       Int            @default(0)
   company          Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   observations     Observation[]
+  observationRevisions ObservationRevision[]
   signals          Signal[]
   clusters         SignalCluster[]
   @@schema("hunt")
