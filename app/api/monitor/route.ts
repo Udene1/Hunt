@@ -188,9 +188,14 @@ async function persist(
             unchangedObservationCount++;
           }
 
+          const sourceTier = observation.source.toLowerCase().includes("regulator") || /cbn|sec|cac|ndpc|nitda|fccpc/i.test(observation.source) ? "authoritative" : /official|github|company/i.test(observation.source) ? "first_party" : "secondary";
+          const verificationStatus = observation.url ? "reachable" : "unverified";
+          const entityConfidence = observation.source === "Official website" || observation.source === "GitHub" ? 90 : 70;
+          const evidenceConfidence = sourceTier === "authoritative" ? 95 : sourceTier === "first_party" ? 85 : 65;
           await tx.observation.update({
             where: { id: existing.id },
             data: {
+              sourceTier, verificationStatus, entityConfidence, evidenceConfidence,
               lastSeenAt: new Date(),
               observedAt: new Date(observation.observedAt),
               runId: run.id,
@@ -200,6 +205,10 @@ async function persist(
               title: observation.title,
               url: observation.url,
               metadata: observation.metadata,
+              sourceTier,
+              verificationStatus,
+              entityConfidence,
+              evidenceConfidence,
               status: "active",
               missCount: 0,
               lastProbeAt: observation.source === "Official public surface" ? new Date() : existing.lastProbeAt,
@@ -230,6 +239,10 @@ async function persist(
             changedObservations.push(observation);
           }
 
+          const sourceTier = observation.source.toLowerCase().includes("regulator") || /cbn|sec|cac|ndpc|nitda|fccpc/i.test(observation.source) ? "authoritative" : /official|github|company/i.test(observation.source) ? "first_party" : "secondary";
+          const verificationStatus = observation.url ? "reachable" : "unverified";
+          const entityConfidence = observation.source === "Official website" || observation.source === "GitHub" ? 90 : 70;
+          const evidenceConfidence = sourceTier === "authoritative" ? 95 : sourceTier === "first_party" ? 85 : 65;
           const created = await tx.observation.create({
             data: {
               companyId: dbCompany.id,
@@ -242,6 +255,10 @@ async function persist(
               fingerprint: observation.fingerprint,
               observedAt: new Date(observation.observedAt),
               metadata: observation.metadata,
+              sourceTier,
+              verificationStatus,
+              entityConfidence,
+              evidenceConfidence,
               status: "active",
               missCount: 0,
               lastProbeAt: observation.source === "Official public surface" ? new Date() : null,
@@ -329,13 +346,15 @@ async function persist(
       const clusterEvidenceIds = clusterEvidence.map((item) => item.id);
       if (hasHistoricalBaseline && clusterCategorySet.length >= 2 && clusterEvidenceIds.length >= 2) {
         const clusterFingerprint = clusterCategorySet.slice().sort().join("|").toLowerCase();
+        const windowStart = new Date(Date.now() - 14 * 86400000);
+        const windowEnd = new Date();
         const clusterScore = Math.min(99, 60 + Math.min(clusterCategorySet.length, 5) * 6 + Math.min(changedObservationCount, 5) * 2);
         const clusterHeadline = clusterCategorySet.slice(0, 3).join(" + ") + " intersection";
         const clusterDetail = clusterEvidence.length + " current observations intersect across " + clusterCategorySet.length + " signal categories. Hunt stores the evidence; an external AI should investigate whether the intersection represents a commercial opportunity.";
         const cluster = await tx.signalCluster.upsert({
           where: { companyId_fingerprint: { companyId: dbCompany.id, fingerprint: clusterFingerprint } },
-          update: { runId: run.id, score: clusterScore, headline: clusterHeadline, detail: clusterDetail, categories: clusterCategorySet, evidenceIds: clusterEvidenceIds, lastSeenAt: new Date() },
-          create: { companyId: dbCompany.id, runId: run.id, fingerprint: clusterFingerprint, score: clusterScore, headline: clusterHeadline, detail: clusterDetail, categories: clusterCategorySet, evidenceIds: clusterEvidenceIds },
+          update: { runId: run.id, score: clusterScore, headline: clusterHeadline, detail: clusterDetail, categories: clusterCategorySet, evidenceIds: clusterEvidenceIds, windowStart, windowEnd, lastSeenAt: new Date() },
+          create: { companyId: dbCompany.id, runId: run.id, fingerprint: clusterFingerprint, score: clusterScore, headline: clusterHeadline, detail: clusterDetail, categories: clusterCategorySet, evidenceIds: clusterEvidenceIds, windowStart, windowEnd },
         });
         clusterId = cluster.id;
         clusterCreated = true;
@@ -345,12 +364,16 @@ async function persist(
           include: { profile: true },
         });
         for (const watchedUser of watchedUsers) {
+          const watch = await tx.userWatch.findUnique({ where: { userId_companyId: { userId: watchedUser.id, companyId: dbCompany.id } } });
+          const allowedTypes = Array.isArray(watch?.signalTypes) ? (watch?.signalTypes as string[]) : [];
+          const filteredClusterEvidence = allowedTypes.length ? clusterEvidence.filter((item) => allowedTypes.some((type) => item.category.toLowerCase().includes(type.toLowerCase()) || item.type.toLowerCase() === type.toLowerCase())) : clusterEvidence;
+          if (allowedTypes.length && filteredClusterEvidence.length === 0) continue;
           const relevance = scoreCompanyRelevance(
             watchedUser.profile || {},
             dbCompany,
             clusterEvidence.map((item) => ({ ...item, observedAt: item.observedAt })),
           );
-          if (relevance.score < 20 || relevance.confidence === "none") continue;
+          if (relevance.score < Math.max(20, watch?.minScore || 20) || relevance.confidence === "none") continue;
           const candidateFingerprint = clusterFingerprint + "|" + cluster.id;
           const existingCandidate = await tx.opportunityCandidate.findUnique({
             where: { userId_fingerprint: { userId: watchedUser.id, fingerprint: candidateFingerprint } },
