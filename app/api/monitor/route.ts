@@ -7,7 +7,7 @@ import { requireMonitoringAccess } from "../../../lib/entitlements";
 import type { SurfaceProbe } from "../../../lib/product-surfaces";
 import { scoreCompanyRelevance } from "../../../lib/relevance";
 import { createAdminReviewTasks, pushAdminReviewAlert } from "../../../lib/admin-review";
-import { correlateEvidence } from "../../../lib/evidence-correlation";
+import { correlateEvidence, sourceFamily } from "../../../lib/evidence-correlation";
 
 type PersistenceResult = {
   status: "persisted" | "not_configured" | "database_error";
@@ -591,20 +591,34 @@ export async function GET(request: Request) {
 
   const unique = Array.from(new Map(collected.observations.map((x) => [x.fingerprint, x])).values());
   const categories = Array.from(new Set(unique.map((x) => x.category)));
-  const jobCount = unique.filter((x) => x.type === "job").length;
-  const websiteCount = unique.filter((x) => x.type === "website").length;
-  const procurementCount = unique.filter((x) => x.type === "procurement").length;
-  const technologyCount = unique.filter((x) => x.type === "technology").length;
-  const productSurfaceCount = unique.filter((x) => x.category === "Product / API surface").length;
-  const githubCount = unique.filter((x) => x.source === "GitHub").length;
-  const githubVelocityCount = unique.filter((x) => x.category === "Engineering / GitHub velocity").length;
+  const sourceFamilies = Array.from(new Set(unique.map((x) => sourceFamily(x.source, x.url))));
+  const recentCount = unique.filter((x) => Date.now() - new Date(x.observedAt).getTime() <= 14 * 86400000).length;
+  const verifiedCount = unique.filter((x) => /official|regulator|github|procurement|public web/i.test(x.source)).length;
+
+  const evidenceScore = unique.length
+    ? Math.min(
+        99,
+        30 +
+          Math.min(categories.length, 6) * 7 +
+          Math.min(sourceFamilies.length, 6) * 6 +
+          Math.min(recentCount, 8) * 2 +
+          Math.min(verifiedCount, 8),
+      )
+    : 0;
 
   const signal = unique.length
     ? {
-        score: Math.min(98, 52 + Math.min(jobCount, 8) * 4 + Math.min(websiteCount, 1) * 7 + Math.min(procurementCount, 4) * 6 + Math.min(technologyCount, 6) * 4 + Math.min(productSurfaceCount, 4) * 5 + Math.min(githubCount, 6) * 3 + Math.min(githubVelocityCount, 3) * 4 + Math.max(categories.length - 1, 0) * 5),
-        headline: categories.length > 1 ? "Multi-signal activity detected" : categories[0] + " activity",
-        detail: unique.length + " public observation" + (unique.length === 1 ? "" : "s") + " collected across " + (categories.length > 1 ? categories.length + " signal categories." : "the available signal source."),
-        commercialInterpretation: "Investigation required: Hunt records public evidence and observed change. It does not infer a commercial need from signal category alone.",
+        score: evidenceScore,
+        headline: categories.length > 1 ? "Evidence activity detected" : "Public evidence detected",
+        detail:
+          unique.length +
+          " public observations across " +
+          categories.length +
+          " evidence categories and " +
+          sourceFamilies.length +
+          " source families. Review the underlying evidence and observed changes.",
+        commercialInterpretation:
+          "Investigation input only: Hunt does not infer a commercial need from an evidence category or score.",
       }
     : null;
 
