@@ -367,6 +367,57 @@ const productSurfaceAdapter: SignalAdapter = {
   },
 };
 
+
+
+const regulatoryAdapter: SignalAdapter = {
+  id: "authoritative-regulatory",
+  async collect(company) {
+    const observations: Observation[] = [];
+    const errors: string[] = [];
+    const sources = [
+      { name: "SEC Nigeria", base: "https://www.sec.gov.ng/?s=" },
+      { name: "CAC Nigeria", base: "https://www.cac.gov.ng/?s=" },
+    ];
+    for (const source of sources) {
+      try {
+        const response = await fetch(source.base + encodeURIComponent(company), { cache:"no-store", redirect:"follow", headers:{ "user-agent":"Opportunity-Intelligence/0.4 regulatory-evidence" } });
+        if (!response.ok) throw new Error();
+        const html=(await response.text()).slice(0,800000);
+        const clean=html.replace(/<script[\s\S]*?<\/script>/gi," ").replace(/<style[\s\S]*?<\/style>/gi," ").replace(/<[^>]+>/g," ").replace(/&nbsp;/gi," ").replace(/&amp;/gi,"&").replace(/\s+/g," ").trim();
+        const lower=clean.toLowerCase();
+        if (!lower.includes(company.toLowerCase())) continue;
+        const anchors=Array.from(html.matchAll(/<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi));
+        for(const anchor of anchors){
+          const label=anchor[2].replace(/<[^>]+>/g," ").replace(/&nbsp;/gi," ").replace(/&amp;/gi,"&").replace(/\s+/g," ").trim();
+          if(!label || !label.toLowerCase().includes(company.toLowerCase())) continue;
+          const url=new URL(anchor[1],source.base).toString();
+          observations.push({
+            source: source.name,
+            type:"regulatory",
+            title:"Authoritative regulatory reference: "+label.slice(0,180),
+            category:"Regulatory / compliance",
+            url,
+            observedAt:new Date().toISOString(),
+            fingerprint:await sha256("regulatory|"+source.name+"|"+url+"|"+label.toLowerCase()),
+            metadata:{ company, regulator:source.name, matchedCompany:company, sourceTier:"authoritative" },
+          });
+        }
+        if(!observations.some(o=>o.source===source.name)){
+          observations.push({
+            source:source.name,type:"regulatory",
+            title:"Official regulator search result references "+company,
+            category:"Regulatory / compliance",
+            url:source.base+encodeURIComponent(company),
+            observedAt:new Date().toISOString(),
+            fingerprint:await sha256("regulatory|"+source.name+"|search|"+company.toLowerCase()),
+            metadata:{company,regulator:source.name,sourceTier:"authoritative",searchResult:true},
+          });
+        }
+      } catch { errors.push(source.name+" unavailable"); }
+    }
+    return { observations, errors:Array.from(new Set(errors)) };
+  },
+};
 export const SIGNAL_ADAPTERS: SignalAdapter[] = [
   jobAdapter,
   websiteAdapter,
@@ -376,6 +427,7 @@ export const SIGNAL_ADAPTERS: SignalAdapter[] = [
   githubAdapter,
   peopleFinanceAdapter,
   publicSignalAdapter,
+  regulatoryAdapter,
 ];
 
 async function verifyObservationEvidence(observations: Observation[]) {
