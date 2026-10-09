@@ -13,6 +13,15 @@ export async function GET(request: Request) {
   let persisted: Array<{ name: string; domain: string | null; country: string; updatedAt: Date; generalSummary: string | null }> = [];
   if (databaseConfigured()) {
     try {
+      // Reconcile stale persisted domains against explicit canonical catalogue entries.
+      // This repairs legacy records such as Dangote Refinery without conflating it with Dangote Group.
+      await Promise.all(COMPANY_CATALOG.map((company) => prisma.company.updateMany({
+        where: {
+          name: { equals: company.name, mode: "insensitive" },
+          OR: [{ domain: null }, { domain: { not: company.domain } }],
+        },
+        data: { domain: company.domain },
+      })));
       persisted = await prisma.company.findMany({
         where: q ? { OR: [{ name: { contains: q, mode: "insensitive" } }, { domain: { contains: q, mode: "insensitive" } }] } : undefined,
         orderBy: { updatedAt: "desc" },
