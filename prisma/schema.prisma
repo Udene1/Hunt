@@ -146,6 +146,8 @@ model User {
   auditEvents       AuditEvent[]
   pilotCodes        PilotCode[]
   accessTokens      AccessToken[]
+  oauthCodes        OAuthAuthorizationCode[]
+  oauthRefreshTokens OAuthRefreshToken[]
   @@schema("hunt")
 }
 
