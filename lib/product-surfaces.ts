@@ -44,11 +44,11 @@ function normalizeDocumentBody(body: string, contentType: string) {
   }
 
   const visible = body
-    .replace(/<script[\\s\\S]*?<\/script>/gi, " ")
-    .replace(/<style[\\s\\S]*?<\/style>/gi, " ")
-    .replace(/<!--[\\s\\S]*?-->/g, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<!--[\s\S]*?-->/g, " ")
     .replace(/<[^>]+>/g, " ")
-    .replace(/\\s+/g, " ")
+    .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
 
@@ -134,58 +134,59 @@ export async function detectProductSurfaces(
       }
 
       if (response.status < 200 || response.status >= 400) {
-        probes.push({
-          surfaceIdentity,
-          domain,
-          path: candidate.path,
-          label: candidate.label,
-          url,
-          status: "probe_failed",
-          httpStatus: response.status,
-          evidenceUrl: url,
-          checkedAt,
-          reason: "HTTP " + response.status,
-        });
+        probes.push({ surfaceIdentity, domain, path: candidate.path, label: candidate.label, url, status: "probe_failed", httpStatus: response.status, evidenceUrl: url, checkedAt, reason: "HTTP " + response.status });
+        return;
+      }
+
+      // A redirect alone is not proof that a documentation/API surface exists.
+      // Catch-all routing commonly redirects arbitrary paths to a generic page.
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get("location");
+        probes.push({ surfaceIdentity, domain, path: candidate.path, label: candidate.label, url, status: "probe_failed", httpStatus: response.status, evidenceUrl: location ? new URL(location, url).toString() : null, checkedAt, reason: "redirect_not_verified_as_a_real_surface" });
         return;
       }
 
       const contentType = response.headers.get("content-type") || "";
-      const location = response.headers.get("location");
-      const evidenceUrl = location
-        ? new URL(location, url).toString()
-        : url;
-
-      probes.push({
-        surfaceIdentity,
-        domain,
-        path: candidate.path,
-        label: candidate.label,
-        url,
-        status: "present",
-        httpStatus: response.status,
-        evidenceUrl,
-        checkedAt,
-      });
-
-      if (response.status >= 300 && response.status < 400 && location) {
-        const redirected = new URL(location, url);
-        if (samePath(redirected.toString(), "/")) return;
-      }
-
+      const evidenceUrl = url;
       const rawBody = await response.text();
       const body = rawBody.slice(0, 120_000).toLowerCase();
-      const strongApiEvidence =
-        candidate.label.includes("API") ||
-        candidate.label.includes("OpenAPI") ||
-        candidate.label.includes("Swagger") ||
-        /openapi|swagger|api reference|api documentation|developer portal/.test(body);
-
-      if (!strongApiEvidence && candidate.path === "/api") {
-        const looksLikeWebApp =
-          contentType.includes("text/html") &&
-          !/api|json|graphql|developer|documentation/.test(body);
-        if (looksLikeWebApp) return;
+      const visibleText = body
+        .replace(/<script[\s\S]*?<\/script>/gi, " ")
+        .replace(/<style[\s\S]*?<\/style>/gi, " ")
+        .replace(/<!--[\s\S]*?-->/g, " ")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      // Avoid matching generic HTML attributes such as input placeholder="Search".
+      const templateMarkers = ["illustrative pending independent verification", "replace the entries with real", "replace these entries with real", "lorem ipsum", "your company name", "placeholder text", "placeholder content", "sample company data", "replace this text"];
+      const matchedTemplateMarkers = templateMarkers.filter((marker) => visibleText.includes(marker));
+      if (matchedTemplateMarkers.length > 0) {
+        probes.push({ surfaceIdentity, domain, path: candidate.path, label: candidate.label, url, status: "probe_failed", httpStatus: response.status, evidenceUrl: url, checkedAt, reason: "template_or_placeholder_content_detected: " + matchedTemplateMarkers.join(", ") });
+        return;
       }
+
+      let parsedJson: unknown = null;
+      if (contentType.includes("json")) {
+        try { parsedJson = JSON.parse(rawBody); } catch { /* malformed JSON is not a valid API surface */ }
+      }
+      const jsonObject = parsedJson && typeof parsedJson === "object" && !Array.isArray(parsedJson)
+        ? parsedJson as Record<string, unknown>
+        : null;
+      const openApiSpec = Boolean(jsonObject &&
+        (typeof jsonObject.openapi === "string" || typeof jsonObject.swagger === "string") &&
+        jsonObject.paths && typeof jsonObject.paths === "object");
+      const swaggerUi = /swagger-ui(?:-bundle|-standalone-preset)?|swagger-ui-init|redoc/i.test(body);
+      const documentationText = /api reference|api documentation|developer portal|graphql playground|graphiql|apollo sandbox/i.test(body);
+      const apiRootJson = candidate.path === "/api" && Boolean(parsedJson) && contentType.includes("json");
+      const strongApiEvidence = openApiSpec || swaggerUi || documentationText || apiRootJson;
+      const documentationPath = /docs|swagger|developer|openapi/i.test(candidate.path);
+
+      if ((documentationPath && !strongApiEvidence) || (candidate.path === "/api" && !strongApiEvidence)) {
+        probes.push({ surfaceIdentity, domain, path: candidate.path, label: candidate.label, url, status: "probe_failed", httpStatus: response.status, evidenceUrl: url, checkedAt, reason: "response_does_not_contain_recognizable_api_or_documentation_evidence" });
+        return;
+      }
+
+      probes.push({ surfaceIdentity, domain, path: candidate.path, label: candidate.label, url, status: "present", httpStatus: response.status, evidenceUrl, checkedAt });
 
       const normalizedBody = normalizeDocumentBody(rawBody.slice(0, 120_000), contentType);
       const versionSignature = await sha256([

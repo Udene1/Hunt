@@ -6,52 +6,26 @@ function normalizeToken(value: string) {
 
 function scoreCandidate(company: string, title: string, url: string) {
   const tokens = normalizeToken(company).split(" ").filter((token) => token.length >= 3);
-  const haystack = normalizeToken(title + " " + url);
-  let score = 0;
-  for (const token of tokens) if (haystack.includes(token)) score += 2;
-  if (/\.ng\//i.test(url)) score += 1;
-  if (/\b(bank|group|foods|food|holdings|plc|limited|ltd)\b/i.test(title)) score += 1;
-  return score;
-}
-
-async function verifyDomain(domain: string) {
+  const normalizedTitle = normalizeToken(title);
+  let hostname = "";
   try {
-    const response = await fetch("https://" + domain, {
-      method: "GET",
-      redirect: "follow",
-      cache: "no-store",
-      headers: { "user-agent": "Opportunity-Intelligence/0.2 company-discovery" },
-    });
-    if (!response.ok) return null;
-    const finalUrl = new URL(response.url);
-    return finalUrl.hostname.toLowerCase().replace(/^www\\./, "");
-  } catch {
-    return null;
-  }
+    const rawHost = new URL(url).hostname.toLowerCase();
+    hostname = normalizeToken(rawHost.startsWith("www.") ? rawHost.slice(4) : rawHost);
+  } catch { return 0; }
+  const titleTokens = normalizedTitle.split(" ");
+  const hostTokens = hostname.split(" ");
+  const titleMatches = tokens.filter((token) => titleTokens.some((part) => part.includes(token))).length;
+  const hostMatches = tokens.filter((token) => hostTokens.some((part) => part.includes(token))).length;
+  if (titleMatches === 0 || hostMatches === 0) return 0;
+  let score = titleMatches * 3 + hostMatches * 2;
+  if (hostname.endsWith(" ng")) score += 1;
+  if (["bank", "group", "foods", "food", "holdings", "plc", "limited", "ltd"].some((word) => titleTokens.includes(word))) score += 1;
+  return score;
 }
 
 export async function discoverCompanyDomain(company: string) {
   const seed = findCompany(company);
   if (seed) return { name: seed.name, domain: seed.domain, source: "catalogue" as const };
-
-  const normalized = normalizeToken(company);
-  const compact = normalized.replace(/\\s+/g, "");
-  const words = normalized.split(" ").filter(Boolean);
-  const suffixFree = words.filter((word) => !/^(plc|limited|ltd|inc|incorporated|company|co)$/.test(word));
-  const candidates = Array.from(new Set([
-    compact + ".com",
-    suffixFree.join("") + ".com",
-    suffixFree.join("-") + ".com",
-    compact + ".com.ng",
-    suffixFree.join("") + ".com.ng",
-    suffixFree.join("-") + ".com.ng",
-    compact + ".ng",
-  ]));
-
-  for (const candidate of candidates) {
-    const domain = await verifyDomain(candidate);
-    if (domain) return { name: company, domain, source: "direct" as const };
-  }
 
   const query = encodeURIComponent(company + " Nigeria official website");
   const url = "https://html.duckduckgo.com/html/?q=" + query;

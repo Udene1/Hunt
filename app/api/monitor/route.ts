@@ -204,7 +204,7 @@ async function persist(
 
           const sourceTier = observation.source.toLowerCase().includes("regulator") || /cbn|sec|cac|ndpc|nitda|fccpc/i.test(observation.source) ? "authoritative" : /official|github|company/i.test(observation.source) ? "first_party" : "secondary";
           const verificationStatus = observation.url ? "reachable" : "unverified";
-          const entityConfidence = observation.source === "Official website" || observation.source === "GitHub" ? 90 : 70;
+          const entityConfidence = observation.metadata && typeof observation.metadata === "object" && !Array.isArray(observation.metadata) && "entityIdentityVerified" in observation.metadata && observation.metadata.entityIdentityVerified === true ? 90 : sourceTier === "authoritative" ? 65 : observation.source === "Official website" ? 55 : 40;
           const evidenceConfidence = sourceTier === "authoritative" ? 95 : sourceTier === "first_party" ? 85 : 65;
           if (classificationChanged) {
             await tx.observationRevision.create({
@@ -270,7 +270,7 @@ async function persist(
 
           const sourceTier = observation.source.toLowerCase().includes("regulator") || /cbn|sec|cac|ndpc|nitda|fccpc/i.test(observation.source) ? "authoritative" : /official|github|company/i.test(observation.source) ? "first_party" : "secondary";
           const verificationStatus = observation.url ? "reachable" : "unverified";
-          const entityConfidence = observation.source === "Official website" || observation.source === "GitHub" ? 90 : 70;
+          const entityConfidence = observation.metadata && typeof observation.metadata === "object" && !Array.isArray(observation.metadata) && "entityIdentityVerified" in observation.metadata && observation.metadata.entityIdentityVerified === true ? 90 : sourceTier === "authoritative" ? 65 : observation.source === "Official website" ? 55 : 40;
           const evidenceConfidence = sourceTier === "authoritative" ? 95 : sourceTier === "first_party" ? 85 : 65;
           const created = await tx.observation.create({
             data: {
