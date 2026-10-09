@@ -7,7 +7,7 @@ export type CompanySeed = {
 
 export const COMPANY_CATALOG: CompanySeed[] = [
   { name: "Dangote Refinery", domain: "refinery.dangote.com", description: "Petroleum refining, petrochemicals and related industrial infrastructure; canonical refinery site seeded for investigation.", sectors: ["Energy", "Oil and gas", "Refining", "Petrochemicals", "Industrial infrastructure"] },
-  { name: "Dangote Group", domain: "dangote.com", description: "Corporate group website; related corporate domain, not interchangeable with the refinery operating site.", sectors: ["Conglomerate", "Industrial", "Manufacturing", "Energy"] },
+  { name: "Dangote", domain: "dangote.com", description: "Parent company website; distinct from the Dangote Refinery operating record.", sectors: ["Conglomerate", "Industrial", "Manufacturing", "Energy"] },
   { name: "Flutterwave", domain: "flutterwave.com", description: "Payments infrastructure and commerce technology.", sectors: ["Fintech", "Payments", "Infrastructure"] },
   { name: "Moniepoint", domain: "moniepoint.com", description: "Payments, banking, credit and business management infrastructure.", sectors: ["Fintech", "Banking", "Payments"] },
   { name: "Kora", domain: "korapay.com", description: "Payments infrastructure for businesses operating across Africa.", sectors: ["Fintech", "Payments", "Infrastructure"] },
