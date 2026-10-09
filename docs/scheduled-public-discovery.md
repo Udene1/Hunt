@@ -2,12 +2,12 @@
 
 ## Purpose
 
-Hunt now has a separate scheduled public-discovery route in addition to the existing watched-company monitor.
+Hunt has a public-discovery route in addition to the existing watched-company monitor. To stay within the current one-cron limit, only watched-company monitoring is scheduled; public discovery is triggered manually from the authenticated admin console.
 
 - `/api/cron/monitor` monitors a rotating batch of up to five already-watched companies.
-- `/api/cron/discover` searches broad public-web topics independently of the watch list and stores the resulting candidates durably.
+- `/api/cron/discover` searches broad public-web topics independently of the watch list and stores the resulting candidates durably. The admin console invokes it through `POST /api/admin/discovery` with `{ "kind": "discovery" }`; the same endpoint supports `{ "kind": "monitor" }` to trigger watched-company monitoring.
 
-Both routes require `Authorization: Bearer <CRON_SECRET>`. Vercel Cron supplies this header when the project environment variable `CRON_SECRET` is configured.
+Both underlying routes require `Authorization: Bearer <CRON_SECRET>`. The admin trigger requires a valid Hunt admin session and adds the cron secret server-side; it never sends the secret to the browser. The scheduled monitor uses Vercel Cron.
 
 ## Discovery topics
 
@@ -33,5 +33,5 @@ Unresolved candidates are stored for review with their source URL, topic, search
 - This is scheduled search-result discovery, not a complete internet crawler or a guarantee of coverage.
 - The search provider may rate-limit, change markup, or return irrelevant results. Failures are returned per topic.
 - Search-result candidates are leads to inspect, not verified claims.
-- The route runs independently of watched-company monitoring, but Vercel must have the cron registered on a successful production deployment. Preview deployments do not prove the production schedule is active.
+- Manual public discovery works only on a deployment containing the admin trigger and discovery route. The scheduled monitor requires a successful production deployment for its cron registration; preview deployments do not prove the production schedule is active.
 - On the Hobby plan, runtime logs are retained for only one hour. Durable run records should be added in a future schema change so operators can inspect historical cron executions independently of Vercel's short log retention.
