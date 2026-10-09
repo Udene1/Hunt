@@ -62,12 +62,16 @@ async function persist(
   }
 
   const normalized = normalizeCompany(company);
+  // The curated catalogue is the canonical identity source for known entities.
+  // A later scan must never overwrite Dangote Refinery's canonical host with a
+  // stale or guessed domain from a previous record.
+  const canonicalDomain = findCompany(company)?.domain || domain;
   try {
     const result = await prisma.$transaction(async (tx): Promise<PersistenceResult> => {
       const dbCompany = await tx.company.upsert({
         where: { normalized },
-        update: { domain: domain || undefined },
-        create: { name: company, normalized, domain },
+        update: { domain: canonicalDomain || undefined },
+        create: { name: company, normalized, domain: canonicalDomain },
       });
       const priorContacts = await tx.companyContact.findMany({ where: { companyId: dbCompany.id }, select: { name: true, role: true } });
       for (const contact of contacts) {
