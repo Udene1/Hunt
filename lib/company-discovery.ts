@@ -6,11 +6,17 @@ function normalizeToken(value: string) {
 
 function scoreCandidate(company: string, title: string, url: string) {
   const tokens = normalizeToken(company).split(" ").filter((token) => token.length >= 3);
-  const haystack = normalizeToken(title + " " + url);
-  let score = 0;
-  for (const token of tokens) if (haystack.includes(token)) score += 2;
-  if (/\.ng\//i.test(url)) score += 1;
-  if (/\b(bank|group|foods|food|holdings|plc|limited|ltd)\b/i.test(title)) score += 1;
+  const normalizedTitle = normalizeToken(title);
+  let hostname = "";
+  try { hostname = normalizeToken(new URL(url).hostname.replace(/^www\\./i, "")); } catch { return 0; }
+  const titleMatches = tokens.filter((token) => normalizedTitle.includes(token)).length;
+  const hostMatches = tokens.filter((token) => hostname.includes(token)).length;
+  // A name match in a search-result title is not enough: require the candidate
+  // hostname to share a meaningful company token as well.
+  if (titleMatches === 0 || hostMatches === 0) return 0;
+  let score = titleMatches * 3 + hostMatches * 2;
+  if (/\\.ng$/i.test(hostname)) score += 1;
+  if (/\\b(bank|group|foods|food|holdings|plc|limited|ltd)\\b/i.test(title)) score += 1;
   return score;
 }
 
