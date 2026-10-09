@@ -74,7 +74,7 @@ export async function getBearerUser(request: Request) {
     where: { tokenHash: hashToken(token) },
     include: { user: { include: { profile: true } } },
   });
-  if (!access || access.revokedAt) return null;
+  if (!access || access.revokedAt || (access.expiresAt && access.expiresAt <= new Date())) return null;
   if (access.user.plan === "pilot" && (!access.user.pilotExpiresAt || access.user.pilotExpiresAt <= new Date())) return null;
   await prisma.accessToken.update({ where: { id: access.id }, data: { lastUsedAt: new Date() } }).catch(() => {});
   return access.user;
