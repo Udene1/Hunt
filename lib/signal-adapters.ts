@@ -173,10 +173,13 @@ const websiteAdapter: SignalAdapter = {
         .replace(/<[^>]+>/g, " ")
         .replace(/\s+/g, " ")
         .trim();
+      const normalizedLower = normalized.toLowerCase();
+      const placeholderMarkers = ["illustrative pending independent verification", "replace the entries with real", "replace these entries with real", "lorem ipsum", "your company name", "placeholder"].filter((marker) => normalizedLower.includes(marker));
+      const templateSuspected = placeholderMarkers.length > 0;
 
       return {
         observations: [{
-          source: "Official website",
+          source: templateSuspected ? "Website snapshot (template suspected)" : "Website snapshot (identity unverified)",
           type: "website",
           title,
           category: "Website / product",
@@ -188,7 +191,9 @@ const websiteAdapter: SignalAdapter = {
             status: response.status,
             contentLength: normalized.length,
             contentHash: await sha256(normalized),
-            evidenceType: "official_web_snapshot",
+            evidenceType: "web_snapshot_identity_unverified",
+            templateSuspected,
+            placeholderMarkers: placeholderMarkers.join(", "),
           },
         }],
         errors: [],
