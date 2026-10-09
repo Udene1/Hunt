@@ -391,3 +391,48 @@ model AdminPushSubscription {
   @@index([lastUsedAt])
   @@schema("hunt")
 }
+
+model OAuthClient {
+  id                    String   @id
+  name                  String   @default("MCP Client")
+  redirectUris          Json
+  grantTypes             Json
+  tokenEndpointAuthMethod String @default("none")
+  createdAt              DateTime @default(now())
+  codes                  OAuthAuthorizationCode[]
+  refreshTokens          OAuthRefreshToken[]
+  @@schema("hunt")
+}
+
+model OAuthAuthorizationCode {
+  id            String   @id @default(cuid())
+  codeHash      String   @unique
+  clientId      String
+  userId        String
+  redirectUri   String
+  codeChallenge String
+  scope         String   @default("hunt:read")
+  expiresAt     DateTime
+  usedAt        DateTime?
+  createdAt     DateTime @default(now())
+  client        OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user          User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([expiresAt])
+  @@schema("hunt")
+}
+
+model OAuthRefreshToken {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  clientId   String
+  userId     String
+  scope      String   @default("hunt:read")
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime @default(now())
+  client     OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user       User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@schema("hunt")
+}
