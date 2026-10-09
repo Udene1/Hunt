@@ -22,7 +22,7 @@ export default function OAuthAuthorizePage() {
   async function authorize() {
     if (!q) return;
     setBusy(true); setStatus("");
-    const body = Object.fromEntries(["client_id","redirect_uri","response_type","scope","state","code_challenge","code_challenge_method"].map(k => [k, q.get(k) || ""]));
+    const body = Object.fromEntries(["client_id","redirect_uri","response_type","scope","state","code_challenge","code_challenge_method","resource"].map(k => [k, q.get(k) || ""]));
     const r = await fetch("/api/oauth/authorize", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     const d = await r.json().catch(() => ({})); setBusy(false);
     if (!r.ok) { setStatus(d.error || "Authorization failed."); return; }
