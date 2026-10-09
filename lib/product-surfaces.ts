@@ -167,7 +167,7 @@ export async function detectProductSurfaces(
       const openApiSpec = Boolean(jsonObject &&
         (typeof jsonObject.openapi === "string" || typeof jsonObject.swagger === "string") &&
         jsonObject.paths && typeof jsonObject.paths === "object");
-      const swaggerUi = /swagger-ui(?:-bundle|-standalone-preset)?|swagger-ui-init|redoc(?:\\.init)?/i.test(body);
+      const swaggerUi = /swagger-ui(?:-bundle|-standalone-preset)?|swagger-ui-init|redoc/i.test(body);
       const documentationText = /api reference|api documentation|developer portal|graphql playground|graphiql|apollo sandbox/i.test(body);
       const apiRootJson = candidate.path === "/api" && Boolean(parsedJson) && contentType.includes("json");
       const strongApiEvidence = openApiSpec || swaggerUi || documentationText || apiRootJson;
