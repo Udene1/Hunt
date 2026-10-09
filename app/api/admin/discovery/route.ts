@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAdminBearer } from "../../../../lib/auth";
 import { databaseConfigured } from "../../../../lib/db";
+import { GET as runPublicDiscovery } from "../../cron/discover/route";
+import { GET as runWatchedMonitor } from "../../cron/monitor/route";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -27,13 +29,15 @@ export async function POST(request: Request) {
   const path = kind === "discovery" ? "/api/cron/discover" : "/api/cron/monitor";
   const target = new URL(path, request.url);
   try {
-    const response = await fetch(target, {
+    // Invoke the same server-side handler directly. This avoids an extra network
+    // hop and works on deployments protected by Vercel preview authentication.
+    const handler = kind === "discovery" ? runPublicDiscovery : runWatchedMonitor;
+    const scanRequest = new Request(target, {
       method: "GET",
-      cache: "no-store",
       headers: { authorization: `Bearer ${secret}`, accept: "application/json" },
-      signal: AbortSignal.timeout(58_000),
     });
-    const result = await response.json().catch(async () => ({ error: (await response.text().catch(() => "")).slice(0, 1000) }));
+    const response = await handler(scanRequest);
+    const result = await response.json().catch(() => ({}));
     return NextResponse.json({ ok: response.ok, kind, status: response.status, result }, { status: response.ok ? 200 : response.status });
   } catch (error) {
     return NextResponse.json({
@@ -41,6 +45,6 @@ export async function POST(request: Request) {
       kind,
       error: error instanceof Error ? error.message : "Scan request failed",
       note: "The request may have timed out; check the review queue and monitoring history before retrying.",
-    }, { status: 504 });
+    }, { status: 500 });
   }
 }
