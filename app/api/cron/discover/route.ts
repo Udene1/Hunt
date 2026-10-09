@@ -114,8 +114,24 @@ export async function GET(request: Request) {
         const known = matchKnownCompany(title, companies);
         const taskTitle = "Public discovery candidate: " + title.slice(0, 170);
         const detail = "Discovered by Hunt's scheduled public search. Topic: " + family.category + ". This is a search-result candidate, not a verified claim. Confirm the source page, entity identity, event date and whether it belongs to an existing company before treating it as a signal.";
+        let knownCompanyId = known?.id || null;
 
-        if (known?.id) {
+        // Curated catalogue identity is sufficient to create its missing durable
+        // company row; arbitrary names extracted from web results are not.
+        if (known && !knownCompanyId) {
+          const seed = COMPANY_CATALOG.find((company) => normalizeCompany(company.name) === normalizeCompany(known.name));
+          if (seed) {
+            const dbCompany = await prisma.company.upsert({
+              where: { normalized: normalizeCompany(seed.name) },
+              update: { domain: seed.domain },
+              create: { name: seed.name, normalized: normalizeCompany(seed.name), domain: seed.domain, country: "NG" },
+              select: { id: true },
+            });
+            knownCompanyId = dbCompany.id;
+          }
+        }
+
+        if (known && knownCompanyId) {
           // Only attach a search result to a known company when the company name
           // appears in the result title. Reachability is checked before persistence.
           try {
@@ -138,10 +154,10 @@ export async function GET(request: Request) {
 
             if (reachable) {
               await prisma.observation.upsert({
-                where: { companyId_fingerprint: { companyId: known.id, fingerprint } },
+                where: { companyId_fingerprint: { companyId: knownCompanyId, fingerprint } },
                 update: { lastSeenAt: runAt, url: finalUrl, metadata: { discoveryFamily: family.id, candidateOnly: true, sourceUrl: finalUrl, searchQuery: family.query } },
                 create: {
-                  companyId: known.id,
+                  companyId: knownCompanyId,
                   source: "Scheduled public discovery",
                   type: family.type,
                   category: family.category,
@@ -181,7 +197,7 @@ export async function GET(request: Request) {
               searchQuery: family.query,
               lastSeenAt: runAt.toISOString(),
               matchedCompany: known?.name || null,
-              identityStatus: known ? "known_name_but_no_persisted_match_or_unreachable" : "unresolved",
+              identityStatus: known ? "known_name_but_source_unreachable" : "unresolved",
               claimVerificationStatus: "not_independently_verified",
             } as Prisma.InputJsonValue,
           },
