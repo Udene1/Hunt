@@ -39,7 +39,7 @@ export async function GET(request: Request) {
   }
 
   const allCompanies = Array.from(merged.values());
-  const canonicalDomains = new Set(COMPANY_CATALOG.map((company) => company.domain.toLowerCase().replace(/^www\\./, "")));
+  const canonicalDomains = new Set(COMPANY_CATALOG.map((company) => company.domain.toLowerCase().replace(/^www\./, "")));
   const normalizedName = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
   // Older automatic search scans created truncated company names while users typed.
   // Hide only unsubstantiated prefix records when a longer company record exists;
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
   const visibleCompanies = allCompanies.filter((company) => {
     if (!company.persisted || company.summary) return true;
     const normalized = normalizedName(company.name);
-    const domain = company.domain.toLowerCase().replace(/^www\\./, "");
+    const domain = company.domain.toLowerCase().replace(/^www\./, "");
     const hasKnownDomain = canonicalDomains.has(domain);
     if (hasKnownDomain) return true;
     return !allCompanies.some((other) => {
