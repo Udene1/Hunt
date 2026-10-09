@@ -294,6 +294,7 @@ async function authorized(request: Request) {
       status: 401,
       headers: {
         "content-type": "application/json",
+        "www-authenticate": `Bearer resource_metadata="${new URL(request.url).origin}/.well-known/oauth-protected-resource", scope="hunt:read"`,
       },
     });
   }
