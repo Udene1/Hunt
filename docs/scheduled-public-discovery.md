@@ -24,7 +24,7 @@ The route reports counts and per-topic errors in its JSON response. It stores ca
 
 ## Entity association rules
 
-A candidate is attached to an existing company only when the company's name appears in the search-result title, the company already has a persisted record, and the source URL is reachable. The observation is explicitly marked as candidate evidence with `verificationStatus = reachable_unverified`; reachability is not claim verification.
+A candidate is attached to a company only when the company's name appears in the search-result title and the source URL is reachable. If the match is a curated canonical catalogue entry without a database row, Hunt creates that known company row first. The observation is explicitly marked as candidate evidence with `verificationStatus = reachable_unverified`; reachability is not claim verification.
 
 Unresolved candidates are stored for review with their source URL, topic, search query, first/last seen metadata, and verification status. **This first pass deliberately does not create a company from a search-result title alone.** That would risk polluting the catalogue with publishers, project names, subsidiaries, or false name matches. A later entity-resolution stage should create new company records only when it can establish a sufficiently reliable company identity from stronger evidence such as a legal registry record or a verified official domain.
 
