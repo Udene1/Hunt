@@ -150,8 +150,16 @@ export async function detectProductSurfaces(
       const evidenceUrl = url;
       const rawBody = await response.text();
       const body = rawBody.slice(0, 120_000).toLowerCase();
-      const templateMarkers = ["illustrative pending independent verification", "replace the entries with real", "replace these entries with real", "lorem ipsum", "your company name", "placeholder"];
-      const matchedTemplateMarkers = templateMarkers.filter((marker) => body.includes(marker));
+      const visibleText = body
+        .replace(/<script[\s\S]*?<\/script>/gi, " ")
+        .replace(/<style[\s\S]*?<\/style>/gi, " ")
+        .replace(/<!--[\s\S]*?-->/g, " ")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      // Avoid matching generic HTML attributes such as input placeholder="Search".
+      const templateMarkers = ["illustrative pending independent verification", "replace the entries with real", "replace these entries with real", "lorem ipsum", "your company name", "placeholder text", "placeholder content", "sample company data", "replace this text"];
+      const matchedTemplateMarkers = templateMarkers.filter((marker) => visibleText.includes(marker));
       if (matchedTemplateMarkers.length > 0) {
         probes.push({ surfaceIdentity, domain, path: candidate.path, label: candidate.label, url, status: "probe_failed", httpStatus: response.status, evidenceUrl: url, checkedAt, reason: "template_or_placeholder_content_detected: " + matchedTemplateMarkers.join(", ") });
         return;
