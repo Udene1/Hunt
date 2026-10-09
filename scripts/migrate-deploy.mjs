@@ -1,5 +1,12 @@
 import { execFileSync } from "node:child_process";
 
+// Never migrate the shared durable database from a preview deployment or local
+// build. Only production deploys (or an explicit operator override) may migrate.
+if (process.env.VERCEL_ENV !== "production" && process.env.HUNT_RUN_MIGRATIONS !== "1") {
+  console.log("Skipping database migrations outside production; Prisma client generation/build continues.");
+  process.exit(0);
+}
+
 function run(args) {
   try {
     execFileSync("npx", ["prisma", "migrate", ...args], { stdio: "inherit", env: process.env });
