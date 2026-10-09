@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     const key = c.name.toLowerCase();
     const existing = merged.get(key);
     if (existing) {
-      merged.set(key, { ...existing, domain: existing.domain || c.domain, persisted: true, summary: c.generalSummary });
+      merged.set(key, { ...existing, domain: existing.domain, persisted: true, summary: c.generalSummary });
     } else {
       merged.set(key, {
         name: c.name,
