@@ -81,11 +81,16 @@ export async function GET(request: Request) {
     ...companiesInDb,
   ].filter((company, index, all) => all.findIndex((other) => normalizeCompany(other.name) === normalizeCompany(company.name)) === index);
 
+  const requestedFamily = new URL(request.url).searchParams.get("family");
+  const familiesToRun = requestedFamily ? FAMILIES.filter((family) => family.id === requestedFamily) : FAMILIES;
+  if (requestedFamily && familiesToRun.length === 0) {
+    return NextResponse.json({ ok: false, error: "Unknown discovery family", allowed: FAMILIES.map((family) => family.id) }, { status: 400 });
+  }
   const results: Array<{ family: string; fetched: number; attached: number; queued: number; errors: string[] }> = [];
   let attached = 0;
   let queued = 0;
 
-  for (const family of FAMILIES) {
+  for (const family of familiesToRun) {
     const errors: string[] = [];
     let familyFetched = 0;
     let familyAttached = 0;
@@ -104,7 +109,7 @@ export async function GET(request: Request) {
       const html = (await response.text()).slice(0, 900000);
       const anchors = Array.from(html.matchAll(/<a[^>]+class=["'][^"']*result__a[^"']*["'][^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi));
 
-      for (const anchor of anchors.slice(0, 8)) {
+      for (const anchor of anchors.slice(0, 5)) {
         const url = unwrapUrl(anchor[1]);
         const title = clean(anchor[2]).slice(0, 220);
         if (!url || title.length < 12) continue;
