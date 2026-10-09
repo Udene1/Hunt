@@ -10,6 +10,38 @@ import { scoreCompanyRelevance } from "../../../lib/relevance";
 import { createAdminReviewTasks, pushAdminReviewAlert } from "../../../lib/admin-review";
 import { correlateEvidence, sourceFamily } from "../../../lib/evidence-correlation";
 
+function classifyObservationQuality(observation: Observation, canonicalDomain: string | null) {
+  const metadata = observation.metadata || {};
+  const source = observation.source.toLowerCase();
+  const templateSuspected = metadata.templateSuspected === true || source.includes("template suspected");
+  let exactCanonicalHostMatch = false;
+  try {
+    if (observation.url && canonicalDomain) {
+      const observedHost = new URL(observation.url).hostname.toLowerCase().replace(/^www\./, "");
+      const domainUrl = canonicalDomain.includes("://") ? canonicalDomain : "https://" + canonicalDomain;
+      const canonicalHost = new URL(domainUrl).hostname.toLowerCase().replace(/^www\./, "");
+      exactCanonicalHostMatch = observedHost === canonicalHost;
+    }
+  } catch { exactCanonicalHostMatch = false; }
+  const sourceTier = source.includes("regulator") || /cbn|sec|cac|ndpc|nitda|fccpc/i.test(observation.source)
+    ? "authoritative"
+    : ((exactCanonicalHostMatch && !templateSuspected) || /official|github|company/i.test(observation.source))
+      ? "first_party" : "secondary";
+  const entityIdentityVerified = !templateSuspected && (metadata.entityIdentityVerified === true || exactCanonicalHostMatch);
+  const entityConfidence = entityIdentityVerified ? 90 : sourceTier === "authoritative" ? 65 : observation.source === "Official website" ? 55 : 40;
+  const evidenceConfidence = sourceTier === "authoritative" ? 95 : sourceTier === "first_party" ? 85 : 65;
+  const verificationStatus = templateSuspected ? "template_suspected" : observation.url ? "reachable" : "unverified";
+  const enrichedMetadata: Observation["metadata"] = {
+    ...metadata,
+    ...(exactCanonicalHostMatch && !templateSuspected ? {
+      entityIdentityVerified: true,
+      entityIdentityBasis: "exact_canonical_hostname_match",
+      claimVerificationStatus: "source_observed_not_independently_verified",
+    } : {}),
+  };
+  return { sourceTier, entityConfidence, evidenceConfidence, verificationStatus, metadata: enrichedMetadata };
+}
+
 type PersistenceResult = {
   status: "persisted" | "not_configured" | "database_error";
   newObservationCount: number;
@@ -206,10 +238,8 @@ async function persist(
             unchangedObservationCount++;
           }
 
-          const sourceTier = observation.source.toLowerCase().includes("regulator") || /cbn|sec|cac|ndpc|nitda|fccpc/i.test(observation.source) ? "authoritative" : /official|github|company/i.test(observation.source) ? "first_party" : "secondary";
-          const verificationStatus = observation.url ? "reachable" : "unverified";
-          const entityConfidence = observation.metadata && typeof observation.metadata === "object" && !Array.isArray(observation.metadata) && "entityIdentityVerified" in observation.metadata && observation.metadata.entityIdentityVerified === true ? 90 : sourceTier === "authoritative" ? 65 : observation.source === "Official website" ? 55 : 40;
-          const evidenceConfidence = sourceTier === "authoritative" ? 95 : sourceTier === "first_party" ? 85 : 65;
+          const quality = classifyObservationQuality(observation, canonicalDomain);
+          const { sourceTier, verificationStatus, entityConfidence, evidenceConfidence } = quality;
           if (classificationChanged) {
             await tx.observationRevision.create({
               data: {
@@ -242,7 +272,7 @@ async function persist(
               category: observation.category,
               title: observation.title,
               url: observation.url,
-              metadata: observation.metadata ? { ...observation.metadata, changeKind: classificationChanged ? "changed" : "unchanged" } : { changeKind: classificationChanged ? "changed" : "unchanged" }, status: "active",
+              metadata: { ...quality.metadata, changeKind: classificationChanged ? "changed" : "unchanged" }, status: "active",
               missCount: 0,
               lastProbeAt: observation.source === "Official public surface" ? new Date() : existing.lastProbeAt,
               missingSince: observation.source === "Official public surface" ? null : existing.missingSince,
@@ -272,10 +302,8 @@ async function persist(
             changedObservations.push(observation);
           }
 
-          const sourceTier = observation.source.toLowerCase().includes("regulator") || /cbn|sec|cac|ndpc|nitda|fccpc/i.test(observation.source) ? "authoritative" : /official|github|company/i.test(observation.source) ? "first_party" : "secondary";
-          const verificationStatus = observation.url ? "reachable" : "unverified";
-          const entityConfidence = observation.metadata && typeof observation.metadata === "object" && !Array.isArray(observation.metadata) && "entityIdentityVerified" in observation.metadata && observation.metadata.entityIdentityVerified === true ? 90 : sourceTier === "authoritative" ? 65 : observation.source === "Official website" ? 55 : 40;
-          const evidenceConfidence = sourceTier === "authoritative" ? 95 : sourceTier === "first_party" ? 85 : 65;
+          const quality = classifyObservationQuality(observation, canonicalDomain);
+          const { sourceTier, verificationStatus, entityConfidence, evidenceConfidence } = quality;
           const created = await tx.observation.create({
             data: {
               companyId: dbCompany.id,
@@ -287,7 +315,7 @@ async function persist(
               url: observation.url,
               fingerprint: observation.fingerprint,
               observedAt: new Date(observation.observedAt),
-              metadata: observation.metadata,
+              metadata: quality.metadata,
               sourceTier,
               verificationStatus,
               entityConfidence,
