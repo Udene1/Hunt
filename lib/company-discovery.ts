@@ -8,15 +8,18 @@ function scoreCandidate(company: string, title: string, url: string) {
   const tokens = normalizeToken(company).split(" ").filter((token) => token.length >= 3);
   const normalizedTitle = normalizeToken(title);
   let hostname = "";
-  try { hostname = normalizeToken(new URL(url).hostname.replace(/^www\\./i, "")); } catch { return 0; }
-  const titleMatches = tokens.filter((token) => normalizedTitle.includes(token)).length;
-  const hostMatches = tokens.filter((token) => hostname.includes(token)).length;
-  // A name match in a search-result title is not enough: require the candidate
-  // hostname to share a meaningful company token as well.
+  try {
+    const rawHost = new URL(url).hostname.toLowerCase();
+    hostname = normalizeToken(rawHost.startsWith("www.") ? rawHost.slice(4) : rawHost);
+  } catch { return 0; }
+  const titleTokens = normalizedTitle.split(" ");
+  const hostTokens = hostname.split(" ");
+  const titleMatches = tokens.filter((token) => titleTokens.some((part) => part.includes(token))).length;
+  const hostMatches = tokens.filter((token) => hostTokens.some((part) => part.includes(token))).length;
   if (titleMatches === 0 || hostMatches === 0) return 0;
   let score = titleMatches * 3 + hostMatches * 2;
-  if (/\\.ng$/i.test(hostname)) score += 1;
-  if (/\\b(bank|group|foods|food|holdings|plc|limited|ltd)\\b/i.test(title)) score += 1;
+  if (hostname.endsWith(" ng")) score += 1;
+  if (["bank", "group", "foods", "food", "holdings", "plc", "limited", "ltd"].some((word) => titleTokens.includes(word))) score += 1;
   return score;
 }
 
