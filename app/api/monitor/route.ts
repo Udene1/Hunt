@@ -592,26 +592,26 @@ export async function GET(request: Request) {
     try {
       const exact = await prisma.company.findFirst({
         where: { name: { equals: rawCompany, mode: "insensitive" } },
-        select: { id: true },
+        select: { id: true, domain: true },
       });
-      if (!exact) {
-        const longerMatches = await prisma.company.findMany({
-          where: { name: { startsWith: rawCompany, mode: "insensitive" } },
-          select: { name: true },
-          take: 8,
-        });
-        const normalizedInput = rawCompany.toLowerCase().replace(/[^a-z0-9]/g, "");
-        const partialMatches = longerMatches.filter((item) => {
-          const normalizedName = item.name.toLowerCase().replace(/[^a-z0-9]/g, "");
-          return normalizedName.length > normalizedInput.length && normalizedName.startsWith(normalizedInput);
-        });
-        if (partialMatches.length) {
-          return NextResponse.json({
-            error: "This looks like a partial company name. Choose the complete company record before scanning.",
-            code: "partial_company_name",
-            suggestions: partialMatches.map((item) => item.name),
-          }, { status: 409 });
-        }
+      const longerMatches = await prisma.company.findMany({
+        where: { name: { startsWith: rawCompany, mode: "insensitive" } },
+        select: { name: true },
+        take: 8,
+      });
+      const normalizedInput = rawCompany.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const exactDomainLabel = (exact?.domain || "").toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split(/[./]/)[0].replace(/[^a-z0-9]/g, "");
+      const exactHasMatchingDomain = Boolean(exact && exactDomainLabel && exactDomainLabel === normalizedInput);
+      const partialMatches = longerMatches.filter((item) => {
+        const normalizedName = item.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+        return normalizedName.length > normalizedInput.length && normalizedName.startsWith(normalizedInput);
+      });
+      if (partialMatches.length && !exactHasMatchingDomain) {
+        return NextResponse.json({
+          error: "This looks like a partial company name. Choose the complete company record before scanning.",
+          code: "partial_company_name",
+          suggestions: partialMatches.map((item) => item.name),
+        }, { status: 409 });
       }
     } catch {
       // A temporary lookup failure must not block a valid manual scan.
