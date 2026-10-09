@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Company = {
   name: string;
@@ -44,7 +44,6 @@ export default function Home() {
   const [loading, setLoading] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState<string | null>(null);
   const [watchPersistent, setWatchPersistent] = useState(false);
-  const autoScanTargets = useRef(new Set<string>());
 
   useEffect(() => {
     fetch("/api/companies").then((r) => r.json()).then((d) => setCompanies(d.companies || [])).catch(() => {});
@@ -66,22 +65,17 @@ export default function Home() {
 
   useEffect(() => {
     const needle = q.trim();
-    if (!needle) return;
+    if (!needle) {
+      fetch("/api/companies", { cache: "no-store" })
+        .then((r) => r.json())
+        .then((d) => setCompanies(d.companies || []))
+        .catch(() => {});
+      return;
+    }
     const timer = window.setTimeout(() => {
       fetch("/api/companies?q=" + encodeURIComponent(needle), { cache: "no-store" })
         .then((r) => r.json())
-        .then((d) => {
-          const results = d.companies || [];
-          setCompanies(results);
-          if (
-            needle.length >= 3 &&
-            results.length === 0 &&
-            !autoScanTargets.current.has(needle.toLowerCase())
-          ) {
-            autoScanTargets.current.add(needle.toLowerCase());
-            void runMonitor(needle);
-          }
-        })
+        .then((d) => setCompanies(d.companies || []))
         .catch(() => {});
     }, 220);
     return () => window.clearTimeout(timer);
