@@ -29,6 +29,9 @@ export async function POST(request: Request) {
   }
   const grantType = params.get("grant_type") || "";
   const clientId = params.get("client_id") || "";
+  const resource = params.get("resource") || "";
+  const expectedResource = new URL(request.url).origin + "/api/mcp";
+  if (resource !== expectedResource) return formError("invalid_target");
   const client = await prisma.oAuthClient.findUnique({ where: { id: clientId } });
   if (!client || client.tokenEndpointAuthMethod !== "none") return formError("invalid_client", 401);
 
