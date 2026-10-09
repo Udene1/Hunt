@@ -243,7 +243,7 @@ const procurementAdapter: SignalAdapter = {
             .replace(/\s*(?:read more|»)+\s*$/i, "")
             .trim();
           if (!title) continue;
-          const normalizeWords = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(/\\s+/).filter(Boolean);
+          const normalizeWords = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(/\s+/).filter(Boolean);
           const companyWords = normalizeWords(company).filter((word) => word.length >= 3);
           const titleWords = normalizeWords(title);
           if (!companyWords.length || !companyWords.every((word) => titleWords.includes(word))) continue;
