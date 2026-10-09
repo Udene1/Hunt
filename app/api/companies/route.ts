@@ -38,9 +38,28 @@ export async function GET(request: Request) {
     }
   }
 
+  const allCompanies = Array.from(merged.values());
+  const canonicalDomains = new Set(COMPANY_CATALOG.map((company) => company.domain.toLowerCase().replace(/^www\\./, "")));
+  const normalizedName = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+  // Older automatic search scans created truncated company names while users typed.
+  // Hide only unsubstantiated prefix records when a longer company record exists;
+  // preserve rows with a summary or a known canonical domain. Do not delete history.
+  const visibleCompanies = allCompanies.filter((company) => {
+    if (!company.persisted || company.summary) return true;
+    const normalized = normalizedName(company.name);
+    const domain = company.domain.toLowerCase().replace(/^www\\./, "");
+    const hasKnownDomain = canonicalDomains.has(domain);
+    if (hasKnownDomain) return true;
+    return !allCompanies.some((other) => {
+      if (other.name.toLowerCase() === company.name.toLowerCase()) return false;
+      const otherName = normalizedName(other.name);
+      return otherName.length > normalized.length && otherName.startsWith(normalized);
+    });
+  });
+
   return NextResponse.json({
-    companies: Array.from(merged.values()).slice(0, 100),
-    count: merged.size,
+    companies: visibleCompanies.filter((company) => !q || [company.name, company.domain, company.description, ...company.sectors].join(" ").toLowerCase().includes(q)).slice(0, 100),
+    count: visibleCompanies.length,
     persistentDirectory: databaseConfigured(),
   });
 }
