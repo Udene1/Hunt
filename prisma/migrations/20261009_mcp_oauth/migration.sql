@@ -52,3 +52,5 @@ DO $$ BEGIN
   ALTER TABLE "hunt"."OAuthRefreshToken" ADD CONSTRAINT "OAuthRefreshToken_userId_fkey"
     FOREIGN KEY ("userId") REFERENCES "hunt"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+ALTER TABLE "hunt"."AccessToken" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMP(3);
