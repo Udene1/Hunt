@@ -19,6 +19,9 @@ export async function POST(request: Request) {
   const responseType = typeof body?.response_type === "string" ? body.response_type : "";
   const method = typeof body?.code_challenge_method === "string" ? body.code_challenge_method : "";
   const scope = typeof body?.scope === "string" ? body.scope : "hunt:read";
+  const resource = typeof body?.resource === "string" ? body.resource : "";
+  const expectedResource = new URL(request.url).origin + "/api/mcp";
+  if (resource !== expectedResource) return NextResponse.json({ error: "Invalid resource identifier." }, { status: 400 });
   if (responseType !== "code" || method !== "S256" || !/^[A-Za-z0-9_-]{43,128}$/.test(challenge) || !state || state.length > 1000 || scope.split(/\s+/).some((s: string) => s && s !== "hunt:read")) {
     return NextResponse.json({ error: "Invalid OAuth authorization request. PKCE S256 and the hunt:read scope are required." }, { status: 400 });
   }
