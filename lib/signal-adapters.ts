@@ -242,7 +242,17 @@ const procurementAdapter: SignalAdapter = {
             .trim()
             .replace(/\s*(?:read more|»)+\s*$/i, "")
             .trim();
-          if (!title || !title.toLowerCase().includes(company.toLowerCase())) continue;
+          if (!title) continue;
+          const normalizeWords = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(/\\s+/).filter(Boolean);
+          const companyWords = normalizeWords(company).filter((word) => word.length >= 3);
+          const titleWords = normalizeWords(title);
+          if (!companyWords.length || !companyWords.every((word) => titleWords.includes(word))) continue;
+          // Reject same-name institutions when the target is a different entity type
+          // (e.g. a university tender is not evidence about Dangote Refinery).
+          const entityClasses = ["university", "polytechnic", "college", "school", "hospital", "foundation", "municipality"];
+          const titleClass = entityClasses.find((word) => titleWords.includes(word));
+          const companyClass = entityClasses.find((word) => normalizeWords(company).includes(word));
+          if (titleClass && titleClass !== companyClass) continue;
 
           const url = match[1].startsWith("http")
             ? match[1]
