@@ -134,46 +134,31 @@ export async function detectProductSurfaces(
       }
 
       if (response.status < 200 || response.status >= 400) {
-        probes.push({
-          surfaceIdentity,
-          domain,
-          path: candidate.path,
-          label: candidate.label,
-          url,
-          status: "probe_failed",
-          httpStatus: response.status,
-          evidenceUrl: url,
-          checkedAt,
-          reason: "HTTP " + response.status,
-        });
+        probes.push({ surfaceIdentity, domain, path: candidate.path, label: candidate.label, url, status: "probe_failed", httpStatus: response.status, evidenceUrl: url, checkedAt, reason: "HTTP " + response.status });
+        return;
+      }
+
+      // A redirect alone is not proof that a documentation/API surface exists.
+      // Catch-all routing commonly redirects arbitrary paths to a generic page.
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get("location");
+        probes.push({ surfaceIdentity, domain, path: candidate.path, label: candidate.label, url, status: "probe_failed", httpStatus: response.status, evidenceUrl: location ? new URL(location, url).toString() : null, checkedAt, reason: "redirect_not_verified_as_a_real_surface" });
         return;
       }
 
       const contentType = response.headers.get("content-type") || "";
-      const location = response.headers.get("location");
-      const evidenceUrl = location
-        ? new URL(location, url).toString()
-        : url;
-
-      probes.push({
-        surfaceIdentity,
-        domain,
-        path: candidate.path,
-        label: candidate.label,
-        url,
-        status: "present",
-        httpStatus: response.status,
-        evidenceUrl,
-        checkedAt,
-      });
-
-      if (response.status >= 300 && response.status < 400 && location) {
-        const redirected = new URL(location, url);
-        if (samePath(redirected.toString(), "/")) return;
-      }
-
+      const evidenceUrl = url;
       const rawBody = await response.text();
       const body = rawBody.slice(0, 120_000).toLowerCase();
+      const templateMarkers = ["illustrative pending independent verification", "replace the entries with real", "replace these entries with real", "lorem ipsum", "your company name", "placeholder"];
+      const matchedTemplateMarkers = templateMarkers.filter((marker) => body.includes(marker));
+      if (matchedTemplateMarkers.length > 0) {
+        probes.push({ surfaceIdentity, domain, path: candidate.path, label: candidate.label, url, status: "probe_failed", httpStatus: response.status, evidenceUrl: url, checkedAt, reason: "template_or_placeholder_content_detected: " + matchedTemplateMarkers.join(", ") });
+        return;
+      }
+
+      probes.push({ surfaceIdentity, domain, path: candidate.path, label: candidate.label, url, status: "present", httpStatus: response.status, evidenceUrl, checkedAt });
+
       const strongApiEvidence =
         candidate.label.includes("API") ||
         candidate.label.includes("OpenAPI") ||
