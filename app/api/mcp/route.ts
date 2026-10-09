@@ -294,7 +294,6 @@ async function authorized(request: Request) {
       status: 401,
       headers: {
         "content-type": "application/json",
-        "www-authenticate": 'Bearer realm="Hunt MCP", error="invalid_token"',
       },
     });
   }
