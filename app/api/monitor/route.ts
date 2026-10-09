@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma, databaseConfigured } from "../../../lib/db";
-import { findCompany, normalizeCompany } from "../../../lib/companies";
+import { COMPANY_CATALOG, findCompany, normalizeCompany } from "../../../lib/companies";
 import { discoverCompanyDomain } from "../../../lib/company-discovery";
 import { collectObservations, type Observation } from "../../../lib/signal-adapters";
 import { requireMonitoringAccess } from "../../../lib/entitlements";
@@ -62,12 +62,16 @@ async function persist(
   }
 
   const normalized = normalizeCompany(company);
+  // The curated catalogue is the canonical identity source for known entities.
+  // A later scan must never overwrite Dangote Refinery's canonical host with a
+  // stale or guessed domain from a previous record.
+  const canonicalDomain = findCompany(company)?.domain || domain;
   try {
     const result = await prisma.$transaction(async (tx): Promise<PersistenceResult> => {
       const dbCompany = await tx.company.upsert({
         where: { normalized },
-        update: { domain: domain || undefined },
-        create: { name: company, normalized, domain },
+        update: { domain: canonicalDomain || undefined },
+        create: { name: company, normalized, domain: canonicalDomain },
       });
       const priorContacts = await tx.companyContact.findMany({ where: { companyId: dbCompany.id }, select: { name: true, role: true } });
       for (const contact of contacts) {
@@ -586,6 +590,50 @@ export async function GET(request: Request) {
   const domainCandidate = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.[a-z]{2,}(?:\.[a-z]{2,})?$/i.test(cleanedTarget)
     ? cleanedTarget.toLowerCase()
     : null;
+  // Do not turn a live search-box fragment into a durable company record.
+  // Check both the canonical catalogue and persisted companies; the guard must
+  // still work when the database is unavailable or has not indexed a catalogue entry.
+  if (!seed && !domainCandidate) {
+    const normalizedInput = rawCompany.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const catalogueMatches = COMPANY_CATALOG
+      .filter((item) => {
+        const normalizedName = item.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+        return normalizedName.length > normalizedInput.length && normalizedName.startsWith(normalizedInput);
+      })
+      .map((item) => ({ name: item.name, domain: item.domain }));
+    let persistedMatches: Array<{ name: string; domain: string | null }> = [];
+    let exact: { id: string; domain: string | null } | null = null;
+    if (databaseConfigured()) {
+      try {
+        exact = await prisma.company.findFirst({
+          where: { name: { equals: rawCompany, mode: "insensitive" } },
+          select: { id: true, domain: true },
+        });
+        persistedMatches = await prisma.company.findMany({
+          where: { name: { startsWith: rawCompany, mode: "insensitive" } },
+          select: { name: true, domain: true },
+          take: 20,
+        });
+      } catch {
+        // The catalogue guard below remains active even if database lookup fails.
+      }
+    }
+    const exactDomainLabel = (exact?.domain || "").toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split(/[./]/)[0].replace(/[^a-z0-9]/g, "");
+    const exactHasMatchingDomain = Boolean(exact && exactDomainLabel && exactDomainLabel === normalizedInput);
+    const longerMatches = [...catalogueMatches, ...persistedMatches];
+    const partialMatches = longerMatches.filter((item) => {
+      const normalizedName = item.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+      return normalizedName.length > normalizedInput.length && normalizedName.startsWith(normalizedInput);
+    });
+    const suggestions = Array.from(new Map(partialMatches.map((item) => [item.name.toLowerCase(), item.name])).values());
+    if (suggestions.length && !exactHasMatchingDomain) {
+      return NextResponse.json({
+        error: "This looks like a partial company name. Choose the complete company record before scanning.",
+        code: "partial_company_name",
+        suggestions,
+      }, { status: 409 });
+    }
+  }
   const discovered = seed || domainCandidate
     ? { name: seed?.name || (domainCandidate ? cleanedTarget.split(".")[0].replace(/[-_]+/g, " ") : rawCompany), domain: seed?.domain || domainCandidate, source: seed ? "catalogue" as const : "input" as const }
     : await discoverCompanyDomain(rawCompany);
