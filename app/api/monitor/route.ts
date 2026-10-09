@@ -27,7 +27,7 @@ function classifyObservationQuality(observation: Observation, canonicalDomain: s
     ? "authoritative"
     : ((exactCanonicalHostMatch && !templateSuspected) || /official|github|company/i.test(observation.source))
       ? "first_party" : "secondary";
-  const entityIdentityVerified = metadata.entityIdentityVerified === true || (exactCanonicalHostMatch && !templateSuspected);
+  const entityIdentityVerified = !templateSuspected && (metadata.entityIdentityVerified === true || exactCanonicalHostMatch);
   const entityConfidence = entityIdentityVerified ? 90 : sourceTier === "authoritative" ? 65 : observation.source === "Official website" ? 55 : 40;
   const evidenceConfidence = sourceTier === "authoritative" ? 95 : sourceTier === "first_party" ? 85 : 65;
   const verificationStatus = templateSuspected ? "template_suspected" : observation.url ? "reachable" : "unverified";
