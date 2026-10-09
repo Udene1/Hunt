@@ -6,7 +6,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const q = new URL(request.url).searchParams.get("q")?.trim().toLowerCase() || "";
-  const companies = COMPANY_CATALOG.filter((c) => !q || [c.name, c.domain, c.description, ...c.sectors].join(" ").toLowerCase().includes(q));
+  // Merge the complete curated catalogue first so an old database domain cannot
+  // cause its canonical company seed to be omitted from search results.
+  const companies = COMPANY_CATALOG;
 
   let persisted: Array<{ name: string; domain: string | null; country: string; updatedAt: Date; generalSummary: string | null }> = [];
   if (databaseConfigured()) {
