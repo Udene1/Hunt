@@ -44,11 +44,11 @@ function normalizeDocumentBody(body: string, contentType: string) {
   }
 
   const visible = body
-    .replace(/<script[\\s\\S]*?<\/script>/gi, " ")
-    .replace(/<style[\\s\\S]*?<\/style>/gi, " ")
-    .replace(/<!--[\\s\\S]*?-->/g, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<!--[\s\S]*?-->/g, " ")
     .replace(/<[^>]+>/g, " ")
-    .replace(/\\s+/g, " ")
+    .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
 
