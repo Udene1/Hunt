@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma, databaseConfigured } from "../../../lib/db";
-import { findCompany, normalizeCompany } from "../../../lib/companies";
+import { COMPANY_CATALOG, findCompany, normalizeCompany } from "../../../lib/companies";
 import { discoverCompanyDomain } from "../../../lib/company-discovery";
 import { collectObservations, type Observation } from "../../../lib/signal-adapters";
 import { requireMonitoringAccess } from "../../../lib/entitlements";
@@ -587,34 +587,47 @@ export async function GET(request: Request) {
     ? cleanedTarget.toLowerCase()
     : null;
   // Do not turn a live search-box fragment into a durable company record.
-  // If the input is a prefix of a known longer company name, ask for the full name.
-  if (!seed && !domainCandidate && databaseConfigured()) {
-    try {
-      const exact = await prisma.company.findFirst({
-        where: { name: { equals: rawCompany, mode: "insensitive" } },
-        select: { id: true, domain: true },
-      });
-      const longerMatches = await prisma.company.findMany({
-        where: { name: { startsWith: rawCompany, mode: "insensitive" } },
-        select: { name: true },
-        take: 8,
-      });
-      const normalizedInput = rawCompany.toLowerCase().replace(/[^a-z0-9]/g, "");
-      const exactDomainLabel = (exact?.domain || "").toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split(/[./]/)[0].replace(/[^a-z0-9]/g, "");
-      const exactHasMatchingDomain = Boolean(exact && exactDomainLabel && exactDomainLabel === normalizedInput);
-      const partialMatches = longerMatches.filter((item) => {
+  // Check both the canonical catalogue and persisted companies; the guard must
+  // still work when the database is unavailable or has not indexed a catalogue entry.
+  if (!seed && !domainCandidate) {
+    const normalizedInput = rawCompany.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const catalogueMatches = COMPANY_CATALOG
+      .filter((item) => {
         const normalizedName = item.name.toLowerCase().replace(/[^a-z0-9]/g, "");
         return normalizedName.length > normalizedInput.length && normalizedName.startsWith(normalizedInput);
-      });
-      if (partialMatches.length && !exactHasMatchingDomain) {
-        return NextResponse.json({
-          error: "This looks like a partial company name. Choose the complete company record before scanning.",
-          code: "partial_company_name",
-          suggestions: partialMatches.map((item) => item.name),
-        }, { status: 409 });
+      })
+      .map((item) => ({ name: item.name, domain: item.domain }));
+    let persistedMatches: Array<{ name: string; domain: string | null }> = [];
+    let exact: { id: string; domain: string | null } | null = null;
+    if (databaseConfigured()) {
+      try {
+        exact = await prisma.company.findFirst({
+          where: { name: { equals: rawCompany, mode: "insensitive" } },
+          select: { id: true, domain: true },
+        });
+        persistedMatches = await prisma.company.findMany({
+          where: { name: { startsWith: rawCompany, mode: "insensitive" } },
+          select: { name: true, domain: true },
+          take: 20,
+        });
+      } catch {
+        // The catalogue guard below remains active even if database lookup fails.
       }
-    } catch {
-      // A temporary lookup failure must not block a valid manual scan.
+    }
+    const exactDomainLabel = (exact?.domain || "").toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split(/[./]/)[0].replace(/[^a-z0-9]/g, "");
+    const exactHasMatchingDomain = Boolean(exact && exactDomainLabel && exactDomainLabel === normalizedInput);
+    const longerMatches = [...catalogueMatches, ...persistedMatches];
+    const partialMatches = longerMatches.filter((item) => {
+      const normalizedName = item.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+      return normalizedName.length > normalizedInput.length && normalizedName.startsWith(normalizedInput);
+    });
+    const suggestions = Array.from(new Map(partialMatches.map((item) => [item.name.toLowerCase(), item.name])).values());
+    if (suggestions.length && !exactHasMatchingDomain) {
+      return NextResponse.json({
+        error: "This looks like a partial company name. Choose the complete company record before scanning.",
+        code: "partial_company_name",
+        suggestions,
+      }, { status: 409 });
     }
   }
   const discovered = seed || domainCandidate
