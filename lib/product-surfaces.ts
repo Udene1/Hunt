@@ -157,20 +157,28 @@ export async function detectProductSurfaces(
         return;
       }
 
-      probes.push({ surfaceIdentity, domain, path: candidate.path, label: candidate.label, url, status: "present", httpStatus: response.status, evidenceUrl, checkedAt });
-
-      const strongApiEvidence =
-        candidate.label.includes("API") ||
-        candidate.label.includes("OpenAPI") ||
-        candidate.label.includes("Swagger") ||
-        /openapi|swagger|api reference|api documentation|developer portal/.test(body);
-
-      if (!strongApiEvidence && candidate.path === "/api") {
-        const looksLikeWebApp =
-          contentType.includes("text/html") &&
-          !/api|json|graphql|developer|documentation/.test(body);
-        if (looksLikeWebApp) return;
+      let parsedJson: unknown = null;
+      if (contentType.includes("json")) {
+        try { parsedJson = JSON.parse(rawBody); } catch { /* malformed JSON is not a valid API surface */ }
       }
+      const jsonObject = parsedJson && typeof parsedJson === "object" && !Array.isArray(parsedJson)
+        ? parsedJson as Record<string, unknown>
+        : null;
+      const openApiSpec = Boolean(jsonObject &&
+        (typeof jsonObject.openapi === "string" || typeof jsonObject.swagger === "string") &&
+        jsonObject.paths && typeof jsonObject.paths === "object");
+      const swaggerUi = /swagger-ui(?:-bundle|-standalone-preset)?|swagger-ui-init|redoc(?:\\.init)?/i.test(body);
+      const documentationText = /api reference|api documentation|developer portal|graphql playground|graphiql|apollo sandbox/i.test(body);
+      const apiRootJson = candidate.path === "/api" && Boolean(parsedJson) && contentType.includes("json");
+      const strongApiEvidence = openApiSpec || swaggerUi || documentationText || apiRootJson;
+      const documentationPath = /docs|swagger|developer|openapi/i.test(candidate.path);
+
+      if ((documentationPath && !strongApiEvidence) || (candidate.path === "/api" && !strongApiEvidence)) {
+        probes.push({ surfaceIdentity, domain, path: candidate.path, label: candidate.label, url, status: "probe_failed", httpStatus: response.status, evidenceUrl: url, checkedAt, reason: "response_does_not_contain_recognizable_api_or_documentation_evidence" });
+        return;
+      }
+
+      probes.push({ surfaceIdentity, domain, path: candidate.path, label: candidate.label, url, status: "present", httpStatus: response.status, evidenceUrl, checkedAt });
 
       const normalizedBody = normalizeDocumentBody(rawBody.slice(0, 120_000), contentType);
       const versionSignature = await sha256([
