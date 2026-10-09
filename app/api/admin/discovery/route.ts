@@ -17,6 +17,7 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => ({}));
   const kind = body?.kind;
+  const family = body?.family;
   if (kind !== "discovery" && kind !== "monitor") {
     return NextResponse.json({ ok: false, error: "kind must be discovery or monitor" }, { status: 400 });
   }
@@ -32,6 +33,7 @@ export async function POST(request: Request) {
     // Invoke the same server-side handler directly. This avoids an extra network
     // hop and works on deployments protected by Vercel preview authentication.
     const handler = kind === "discovery" ? runPublicDiscovery : runWatchedMonitor;
+    if (kind === "discovery" && typeof family === "string") target.searchParams.set("family", family);
     const scanRequest = new Request(target, {
       method: "GET",
       headers: { authorization: `Bearer ${secret}`, accept: "application/json" },
