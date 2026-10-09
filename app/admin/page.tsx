@@ -75,7 +75,11 @@ export default function AdminPage() {
           const d = await r.json().catch(() => ({}));
           runs.push({ family: families[i], ...d });
           setScanResult({ kind, completed: i + 1, total: families.length, runs: [...runs] });
-          if (!r.ok) throw new Error(d.error || `${families[i]} failed (HTTP ${r.status})`);
+          // Continue through all categories; a single failed provider must not stop the rest.
+        }
+        const failed = runs.filter((run) => run.ok === false || (typeof run.status === "number" && run.status >= 400));
+        if (failed.length) {
+          setMessage("Discovery finished with " + failed.length + " failed categor" + (failed.length === 1 ? "y: " : "ies: ") + failed.map((run) => run.family).join(", ") + ". Other categories were still attempted.");
         }
       } else {
         setScanProgress("Refreshing watched companies…");
