@@ -586,6 +586,37 @@ export async function GET(request: Request) {
   const domainCandidate = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.[a-z]{2,}(?:\.[a-z]{2,})?$/i.test(cleanedTarget)
     ? cleanedTarget.toLowerCase()
     : null;
+  // Do not turn a live search-box fragment into a durable company record.
+  // If the input is a prefix of a known longer company name, ask for the full name.
+  if (!seed && !domainCandidate && databaseConfigured()) {
+    try {
+      const exact = await prisma.company.findFirst({
+        where: { name: { equals: rawCompany, mode: "insensitive" } },
+        select: { id: true },
+      });
+      if (!exact) {
+        const longerMatches = await prisma.company.findMany({
+          where: { name: { startsWith: rawCompany, mode: "insensitive" } },
+          select: { name: true },
+          take: 8,
+        });
+        const normalizedInput = rawCompany.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const partialMatches = longerMatches.filter((item) => {
+          const normalizedName = item.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+          return normalizedName.length > normalizedInput.length && normalizedName.startsWith(normalizedInput);
+        });
+        if (partialMatches.length) {
+          return NextResponse.json({
+            error: "This looks like a partial company name. Choose the complete company record before scanning.",
+            code: "partial_company_name",
+            suggestions: partialMatches.map((item) => item.name),
+          }, { status: 409 });
+        }
+      }
+    } catch {
+      // A temporary lookup failure must not block a valid manual scan.
+    }
+  }
   const discovered = seed || domainCandidate
     ? { name: seed?.name || (domainCandidate ? cleanedTarget.split(".")[0].replace(/[-_]+/g, " ") : rawCompany), domain: seed?.domain || domainCandidate, source: seed ? "catalogue" as const : "input" as const }
     : await discoverCompanyDomain(rawCompany);
