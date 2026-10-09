@@ -17,9 +17,9 @@ function classifyObservationQuality(observation: Observation, canonicalDomain: s
   let exactCanonicalHostMatch = false;
   try {
     if (observation.url && canonicalDomain) {
-      const observedHost = new URL(observation.url).hostname.toLowerCase().replace(/^www\\./, "");
+      const observedHost = new URL(observation.url).hostname.toLowerCase().replace(/^www\./, "");
       const domainUrl = canonicalDomain.includes("://") ? canonicalDomain : "https://" + canonicalDomain;
-      const canonicalHost = new URL(domainUrl).hostname.toLowerCase().replace(/^www\\./, "");
+      const canonicalHost = new URL(domainUrl).hostname.toLowerCase().replace(/^www\./, "");
       exactCanonicalHostMatch = observedHost === canonicalHost;
     }
   } catch { exactCanonicalHostMatch = false; }
