@@ -425,17 +425,6 @@ const regulatoryAdapter: SignalAdapter = {
             metadata:{ company, regulator:source.name, matchedCompany:company, sourceTier:"authoritative" },
           });
         }
-        if(!observations.some(o=>o.source===source.name)){
-          observations.push({
-            source:source.name,type:"regulatory",
-            title:"Official regulator search result references "+company,
-            category:"Regulatory / compliance",
-            url:source.base+encodeURIComponent(company),
-            observedAt:new Date().toISOString(),
-            fingerprint:await sha256("regulatory|"+source.name+"|search|"+company.toLowerCase()),
-            metadata:{company,regulator:source.name,sourceTier:"authoritative",searchResult:true},
-          });
-        }
       } catch { errors.push(source.name+" unavailable"); }
     }
     return { observations, errors:Array.from(new Set(errors)) };

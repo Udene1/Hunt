@@ -21,6 +21,9 @@ export default function AdminPage() {
   const [validityDays, setValidityDays] = useState("7");
   const [newCode, setNewCode] = useState("");
   const [message, setMessage] = useState("");
+  const [scanBusy, setScanBusy] = useState<"discovery" | "monitor" | null>(null);
+  const [scanProgress, setScanProgress] = useState("");
+  const [scanResult, setScanResult] = useState<any>(null);
 
   async function load() {
     const r = await fetch("/api/admin/console", { cache: "no-store" });
@@ -56,6 +59,48 @@ export default function AdminPage() {
     setNewCode(d.code); await load();
   }
 
+  async function triggerScan(kind: "discovery" | "monitor") {
+    setScanBusy(kind); setScanResult(null); setMessage(""); setScanProgress("");
+    try {
+      const families = ["expansion", "procurement", "funding", "relationships", "regulatory", "financial", "operations"];
+      if (kind === "discovery") {
+        const runs: any[] = [];
+        for (let i = 0; i < families.length; i++) {
+          setScanProgress(`Discovery category ${i + 1} of ${families.length}: ${families[i]}`);
+          const r = await fetch("/api/admin/discovery", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ kind, family: families[i] }),
+          });
+          const d = await r.json().catch(() => ({}));
+          runs.push({ family: families[i], ...d });
+          setScanResult({ kind, completed: i + 1, total: families.length, runs: [...runs] });
+          // Continue through all categories; a single failed provider must not stop the rest.
+        }
+        const failed = runs.filter((run) => run.ok === false || (typeof run.status === "number" && run.status >= 400));
+        if (failed.length) {
+          setMessage("Discovery finished with " + failed.length + " failed categor" + (failed.length === 1 ? "y: " : "ies: ") + failed.map((run) => run.family).join(", ") + ". Other categories were still attempted.");
+        }
+      } else {
+        setScanProgress("Refreshing watched companies…");
+        const r = await fetch("/api/admin/discovery", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ kind }),
+        });
+        const d = await r.json().catch(() => ({}));
+        setScanResult({ kind, ...d });
+        if (!r.ok) throw new Error(d.error || `Could not start ${kind} scan (HTTP ${r.status})`);
+      }
+      setScanProgress("Scan completed.");
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Scan request failed.");
+    } finally {
+      setScanBusy(null);
+    }
+  }
+
   async function resolve(id:string) {
     const r=await fetch("/api/admin/review-tasks",{method:"PUT",headers:{"content-type":"application/json"},body:JSON.stringify({id,status:"resolved"})});
     if(r.ok) await load(); else setMessage("Could not resolve task.");
@@ -68,6 +113,16 @@ export default function AdminPage() {
     <header style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:32}}><div><p style={{letterSpacing:2,fontWeight:800}}>HUNT / ADMIN</p><h1 style={{margin:"4px 0"}}>Operations console</h1></div><button onClick={logout}>Sign out</button></header>
     <section style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12}}>
       {Object.entries(m).map(([k,v])=><div key={k} style={{border:"1px solid #ddd",borderRadius:12,padding:16}}><small>{k.replace(/[A-Z]/g," $&")}</small><h2 style={{margin:"8px 0"}}>{v}</h2></div>)}
+    </section>
+    <section style={{border:"1px solid #ddd",borderRadius:12,padding:20,marginTop:24}}>
+      <h2>Discovery &amp; monitoring</h2>
+      <p>Run a scan on demand. Public discovery searches for new business evidence and stores candidates for review; watched-company monitoring refreshes existing watch-list companies.</p>
+      <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+        <button disabled={scanBusy!==null} onClick={()=>triggerScan("discovery")} style={{padding:"10px 14px"}}>{scanBusy==="discovery"?"Running public discovery…":"Run public discovery"}</button>
+        <button disabled={scanBusy!==null} onClick={()=>triggerScan("monitor")} style={{padding:"10px 14px"}}>{scanBusy==="monitor"?"Running watched-company scan…":"Run watched-company scan"}</button>
+      </div>
+      {scanProgress&&<p aria-live="polite">{scanProgress}</p>}
+      {scanResult&&<pre style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere",background:"#f7f7f7",padding:12,borderRadius:8,marginTop:12,maxHeight:360,overflow:"auto"}}>{JSON.stringify(scanResult,null,2)}</pre>}
     </section>
     <section style={{border:"1px solid #ddd",borderRadius:12,padding:20,marginTop:24}}><h2>Company summaries</h2><p>{summaryCounts.missing} missing · {summaryCounts.stale} stale after new evidence</p>{companies.length===0?<p>All catalogue summaries are current.</p>:companies.slice(0,30).map(c=><div key={c.id} style={{borderTop:"1px solid #eee",padding:"10px 0"}}><b>{c.name}</b> · {c.generalSummary?"needs update":"needs summary"}{c.domain&&" · "+c.domain}<div><small>Evidence: {c.summaryEvidenceAt?new Date(c.summaryEvidenceAt).toLocaleDateString():"—"} · Summary: {c.summaryUpdatedAt?new Date(c.summaryUpdatedAt).toLocaleDateString():"—"}</small></div></div>)}</section>
     <section style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20,marginTop:24}}>
