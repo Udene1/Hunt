@@ -97,7 +97,7 @@ export const publicEvidenceDiscoveryAdapter: SignalAdapter = {
         // Parse the result anchor itself, then unwrap DuckDuckGo's uddg parameter.
         const resultPattern = /<a\b[^>]*class=["'][^"']*\bresult__a\b[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
         const candidates: Array<{ url: string; title: string }> = [];
-        for (const match of html.matchAll(resultPattern)) {
+        for (const match of Array.from(html.matchAll(resultPattern))) {
           const url = originalResultUrl(match[1]);
           const title = clean(match[2]).slice(0, 220);
           if (!url || !title) continue;
