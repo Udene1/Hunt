@@ -37,29 +37,37 @@ export async function GET(request: Request) {
   const selected = watches.slice(batchIndex * batchSize, (batchIndex + 1) * batchSize);
   const origin = new URL(request.url).origin;
 
-  const results = [];
-  for (const company of selected) {
+  // Run the selected daily batch concurrently. Serial scans could consume the
+  // entire 60-second cron budget before the final companies were attempted.
+  const results = await Promise.all(selected.map(async (company) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45_000);
     try {
       const response = await fetch(`${origin}/api/monitor?company=${encodeURIComponent(company.name)}`, {
         cache: "no-store",
+        signal: controller.signal,
         headers: { authorization: `Bearer ${secret}` },
       });
       const data = await response.json().catch(() => ({}));
-      results.push({
+      return {
         company: company.name,
         status: response.status,
         change: data.change || null,
         persistence: data.persistence?.status || null,
         errors: data.errors || [],
-      });
+      };
     } catch (error) {
-      results.push({
+      return {
         company: company.name,
         status: 500,
-        error: error instanceof Error ? error.message : String(error),
-      });
+        error: error instanceof Error && error.name === "AbortError"
+          ? "Company scan exceeded the 45-second cron request budget."
+          : error instanceof Error ? error.message : String(error),
+      };
+    } finally {
+      clearTimeout(timeout);
     }
-  }
+  }));
 
   return NextResponse.json({
     ok: true,
