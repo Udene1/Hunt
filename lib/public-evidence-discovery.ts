@@ -81,7 +81,7 @@ export const publicEvidenceDiscoveryAdapter: SignalAdapter = {
   async collect(company, domain) {
     const observations: Observation[] = [];
     const errors: string[] = [];
-    for (const family of families) {
+    await Promise.all(families.map(async (family) => {
       const query = '"' + company.replace(/"/g, "") + '" ' + family.terms;
       const searchUrl = "https://html.duckduckgo.com/html/?q=" + encodeURIComponent(query);
       const controller = new AbortController();
@@ -172,7 +172,7 @@ export const publicEvidenceDiscoveryAdapter: SignalAdapter = {
       } finally {
         clearTimeout(timeout);
       }
-    }
+    }));
     return {
       observations: Array.from(new Map(observations.map((observation) => [observation.fingerprint, observation])).values()),
       errors: Array.from(new Set(errors)),
